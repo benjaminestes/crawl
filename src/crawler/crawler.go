@@ -8,6 +8,10 @@ import (
 	"golang.org/x/net/html"
 )
 
+type Config struct {
+	RobotsUserAgent string
+}
+
 type Crawler struct {
 	Base    *url.URL
 	Current *Node
@@ -16,11 +20,12 @@ type Crawler struct {
 	nodes   chan *Node
 	newlist []*Address
 	robots  *robotstxt.RobotsData
+	*Config
 }
 
 type crawlfn func(*Crawler) crawlfn
 
-func Crawl(base *url.URL) *Crawler {
+func Crawl(base *url.URL, config *Config) *Crawler {
 	c := &Crawler{
 		Base: base,
 		Current: &Node{
@@ -37,8 +42,9 @@ func Crawl(base *url.URL) *Crawler {
 				},
 			},
 		},
-		Seen:  make(map[string]bool),
-		nodes: make(chan *Node),
+		Seen:   make(map[string]bool),
+		nodes:  make(chan *Node),
+		Config: config,
 	}
 	c.Seen[base.String()] = true
 	c.fetchRobots()
@@ -49,17 +55,15 @@ func Crawl(base *url.URL) *Crawler {
 func (c *Crawler) fetchRobots() {
 	resp, err := http.Get(c.Base.Scheme + "://" + c.Base.Host + "/robots.txt")
 	if err != nil {
-		print(c.Base.Scheme + "://" + c.Base.Host + "/robots.txt")
 		return
 	}
 	defer resp.Body.Close()
 
 	robots, err := robotstxt.FromResponse(resp)
 	if err != nil {
-		print("exit 2\n")
 		return
 	}
-	print("got here\n")
+
 	c.robots = robots
 }
 
@@ -92,7 +96,7 @@ func crawlFetch(c *Crawler) crawlfn {
 	}
 
 	// Ridiculous — split this out into functions
-	if c.robots.TestAgent(c.Current.URL.String(), "Googlebot") {
+	if c.robots.TestAgent(c.Current.URL.String(), c.Config.RobotsUserAgent) {
 		resp, err := http.Get(c.Current.URL.String())
 		if err != nil {
 			return nil
