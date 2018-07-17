@@ -47,7 +47,7 @@ func Crawl(u string, config *Config) *Crawler {
 		results: make(chan *Result),
 		Config:  config,
 	}
-	c.Seen[first.Address.Text] = true
+	c.Seen[first.Address.FullAddress] = true
 	c.fetchRobots()
 	go c.run()
 	return c
@@ -150,13 +150,13 @@ func crawlSkip(c *Crawler) crawlfn {
 
 func crawlMerge(c *Crawler) crawlfn {
 	for _, link := range c.newlist {
-		if c.Seen[link.Address.Text] == false {
+		if c.Seen[link.Address.FullAddress] == false {
 			node := &Node{
 				Depth: c.Current.Depth + 1,
 				Link:  link,
 			}
 			c.Queue = append(c.Queue, node)
-			c.Seen[link.Address.Text] = true
+			c.Seen[link.Address.FullAddress] = true
 		}
 	}
 	return crawlSkip

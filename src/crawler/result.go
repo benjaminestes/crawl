@@ -8,7 +8,7 @@ type Pair struct {
 }
 
 type Address struct {
-	Text string
+	FullAddress string
 	*url.URL
 }
 
@@ -19,7 +19,7 @@ func (l *Address) SetURL(u string) {
 		return
 	}
 	l.URL = url
-	l.Text = l.URL.String()
+	l.FullAddress = l.URL.String()
 }
 
 type Result struct {

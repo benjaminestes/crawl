@@ -6,6 +6,7 @@ import (
 	"io/ioutil"
 	"log"
 	"os"
+	"time"
 
 	"github.com/benjaminestes/crawl/src/crawler"
 )
@@ -34,8 +35,11 @@ func main() {
 	}
 	c := crawler.Crawl(url, config)
 
+	count := 0
 	for n := c.Next(); n != nil; n = c.Next() {
 		j, _ := json.Marshal(n)
 		fmt.Printf("%s\n", j)
+		count++
+		fmt.Fprintf(os.Stderr, "\r%s %d", time.Now().Format("2006/01/02 03:04:05"), count)
 	}
 }
