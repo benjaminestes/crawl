@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"io/ioutil"
 	"log"
-	"net/url"
 	"os"
 
 	"github.com/benjaminestes/crawl/src/crawler"
@@ -26,18 +25,14 @@ func main() {
 		os.Exit(0)
 	}
 
-	base, err := url.Parse(os.Args[1])
-	if err != nil {
-		fmt.Println("Broken initial URL.")
-		os.Exit(0)
-	}
+	url := os.Args[1]
 
 	err = json.Unmarshal(configJSON, config)
 	if err != nil {
 		fmt.Println("config error")
 		os.Exit(0)
 	}
-	c := crawler.Crawl(base, config)
+	c := crawler.Crawl(url, config)
 
 	for n := c.Next(); n != nil; n = c.Next() {
 		j, _ := json.Marshal(n)

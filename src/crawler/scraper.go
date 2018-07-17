@@ -6,7 +6,7 @@ import (
 	"golang.org/x/net/html"
 )
 
-func scrape(n *Node, doc *html.Node) {
+func scrape(n *Result, doc *html.Node) {
 	n.Content.Title = firstTextChildOf(findNode("title", nil, doc))
 	n.Content.H1 = firstTextChildOf(findNode("h1", nil, doc))
 	n.Content.Description = attributeValue("content", (findNode("meta", map[string]string{
@@ -82,7 +82,7 @@ func firstTextChildOf(n *html.Node) string {
 	}
 }
 
-func getLinks(base *url.URL, n *html.Node) (links []*Address) {
+func getLinks(base *url.URL, n *html.Node) (links []*Link) {
 	if n.Type == html.ElementNode && n.Data == "a" {
 		for _, attr := range n.Attr {
 			if attr.Key == "href" {
@@ -93,11 +93,9 @@ func getLinks(base *url.URL, n *html.Node) (links []*Address) {
 				}
 
 				newurl := base.ResolveReference(url)
-				newurl.Fragment = "" // Ignore fragments
-				links = append(links, &Address{
-					Full: newurl.String(),
-					URL:  newurl,
-				})
+				newurl.Fragment = ""                        // Ignore fragments
+				link := MakeLink(newurl.String(), "", true) // FIXME: get actual field values
+				links = append(links, link)
 			}
 		}
 	}

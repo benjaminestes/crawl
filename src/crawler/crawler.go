@@ -12,41 +12,42 @@ type Config struct {
 	RobotsUserAgent string
 }
 
+type Node struct {
+	Depth int
+	*Link
+}
+
 type Crawler struct {
 	Base    *url.URL
 	Current *Node
 	Queue   []*Node
-	Seen    map[string]bool
-	nodes   chan *Node
-	newlist []*Address
+	Seen    map[string]bool // Full text of address
+	results chan *Result    // FIXME: rename this, maybe?
+	newlist []*Link
 	robots  *robotstxt.RobotsData
 	*Config
 }
 
 type crawlfn func(*Crawler) crawlfn
 
-func Crawl(base *url.URL, config *Config) *Crawler {
-	c := &Crawler{
-		Base: base,
-		Current: &Node{
-			Address: &Address{
-				Full: base.String(),
-				URL:  base,
-			},
-		},
-		Queue: []*Node{
-			&Node{
-				Address: &Address{
-					Full: base.String(),
-					URL:  base,
-				},
-			},
-		},
-		Seen:   make(map[string]bool),
-		nodes:  make(chan *Node),
-		Config: config,
+func Crawl(u string, config *Config) *Crawler {
+	// This should anticipate a failure condition
+	first := &Node{
+		Depth: 0,
+		Link:  MakeLink(u, "", true),
 	}
-	c.Seen[base.String()] = true
+
+	c := &Crawler{
+		Base:    first.URL,
+		Current: first, // ←
+		Queue: []*Node{ // Only one of these should need to be set...
+			first,
+		},
+		Seen:    make(map[string]bool),
+		results: make(chan *Result),
+		Config:  config,
+	}
+	c.Seen[first.Address.Text] = true
 	c.fetchRobots()
 	go c.run()
 	return c
@@ -69,19 +70,19 @@ func (c *Crawler) fetchRobots() {
 
 // Methods
 
-func (c *Crawler) emit(n *Node) {
-	c.nodes <- n
+func (c *Crawler) emit(n *Result) {
+	c.results <- n
 }
 
 func (c *Crawler) run() {
 	for state := crawlStart; state != nil; {
 		state = state(c)
 	}
-	close(c.nodes)
+	close(c.results)
 }
 
-func (c *Crawler) Next() *Node {
-	node, ok := <-c.nodes
+func (c *Crawler) Next() *Result {
+	node, ok := <-c.results
 	if !ok {
 		return nil
 	}
@@ -96,6 +97,8 @@ func crawlFetch(c *Crawler) crawlfn {
 	}
 
 	// Ridiculous — split this out into functions
+	r := new(Result)
+	r.Address = c.Current.Address
 	if c.robots.TestAgent(c.Current.URL.String(), c.Config.RobotsUserAgent) {
 		resp, err := http.Get(c.Current.URL.String())
 		if err != nil {
@@ -111,25 +114,24 @@ func crawlFetch(c *Crawler) crawlfn {
 		// Process response and fill node
 
 		for k := range resp.Header {
-			c.Current.Response.Header = append(c.Current.Response.Header, &Pair{k, resp.Header.Get(k)})
+			r.Response.Header = append(r.Response.Header, &Pair{k, resp.Header.Get(k)})
 		}
 
-		c.Current.Response.ContentLength = resp.ContentLength
-		c.Current.Response.Status = resp.Status
-		c.Current.Response.StatusCode = resp.StatusCode
-		c.Current.Response.Proto = resp.Proto
-		c.Current.Response.ProtoMajor = resp.ProtoMajor
-		c.Current.Response.ProtoMinor = resp.ProtoMinor
-		scrape(c.Current, tree)
+		r.Response.ContentLength = resp.ContentLength
+		r.Response.Status = resp.Status
+		r.Response.StatusCode = resp.StatusCode
+		r.Response.Proto = resp.Proto
+		r.Response.ProtoMajor = resp.ProtoMajor
+		r.Response.ProtoMinor = resp.ProtoMinor
+		scrape(r, tree)
 
-		c.newlist = getLinks(c.Current.URL, tree)
-		c.Current.Links = c.newlist
+		c.newlist = getLinks(r.URL, tree)
+		r.Links = c.newlist
 	} else {
-		c.Current.Response.Status = "Blocked by robots.txt"
+		r.Response.Status = "Blocked by robots.txt"
 	}
 
-	// Emit before mutating c.Current
-	c.emit(c.Current)
+	c.emit(r)
 	return crawlMerge
 }
 
@@ -148,13 +150,13 @@ func crawlSkip(c *Crawler) crawlfn {
 
 func crawlMerge(c *Crawler) crawlfn {
 	for _, link := range c.newlist {
-		if c.Seen[link.Full] == false {
+		if c.Seen[link.Address.Text] == false {
 			node := &Node{
-				Address: link,
-				Depth:   c.Current.Depth + 1,
+				Depth: c.Current.Depth + 1,
+				Link:  link,
 			}
 			c.Queue = append(c.Queue, node)
-			c.Seen[link.Full] = true
+			c.Seen[link.Address.Text] = true
 		}
 	}
 	return crawlSkip

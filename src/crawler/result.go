@@ -8,11 +8,21 @@ type Pair struct {
 }
 
 type Address struct {
-	Full string
+	Text string
 	*url.URL
 }
 
-type Node struct {
+func (l *Address) SetURL(u string) {
+	url, err := url.Parse(u)
+	if err != nil {
+		// FIXME: Handle error condition
+		return
+	}
+	l.URL = url
+	l.Text = l.URL.String()
+}
+
+type Result struct {
 	Depth   int
 	Content struct {
 		Description string
@@ -30,6 +40,6 @@ type Node struct {
 		ContentLength int64
 		Header        []*Pair
 	}
-	Links []*Address
+	Links []*Link
 	*Address
 }
