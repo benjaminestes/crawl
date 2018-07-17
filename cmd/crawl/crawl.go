@@ -11,6 +11,10 @@ import (
 	"github.com/benjaminestes/crawl/src/crawler"
 )
 
+var config = &crawler.Config{
+	RobotsUserAgent: "Crawler",
+}
+
 func main() {
 	configJSON, err := ioutil.ReadFile("config.json")
 	if err != nil {
@@ -28,7 +32,6 @@ func main() {
 		os.Exit(0)
 	}
 
-	config := &crawler.Config{}
 	err = json.Unmarshal(configJSON, config)
 	if err != nil {
 		fmt.Println("config error")
