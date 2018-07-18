@@ -1,25 +1,8 @@
 package crawler
 
-import "net/url"
-
 type Pair struct {
 	Key string
 	Val string
-}
-
-type Address struct {
-	FullAddress string
-	*url.URL
-}
-
-func (l *Address) SetURL(u string) {
-	url, err := url.Parse(u)
-	if err != nil {
-		// FIXME: Handle error condition
-		return
-	}
-	l.URL = url
-	l.FullAddress = l.URL.String()
 }
 
 type Result struct {

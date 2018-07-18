@@ -36,11 +36,18 @@ func main() {
 	c := crawler.Crawl(url, config)
 
 	count := 0
+	start := time.Now()
 	for n := c.Next(); n != nil; n = c.Next() {
 		j, _ := json.Marshal(n)
 		fmt.Printf("%s\n", j)
 		count++
-		fmt.Fprintf(os.Stderr, "\r%s %d/%d", time.Now().Format("2006/01/02 03:04:05"), count, len(c.Seen))
+		fmt.Fprintf(
+			os.Stderr,
+			"\r%s %d crawled / %d seen",
+			time.Since(start).Round(time.Second),
+			count,
+			len(c.Seen),
+		)
 	}
 
 	fmt.Printf("\n")
