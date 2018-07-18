@@ -42,4 +42,6 @@ func main() {
 		count++
 		fmt.Fprintf(os.Stderr, "\r%s %d/%d", time.Now().Format("2006/01/02 03:04:05"), count, len(c.Seen))
 	}
+
+	fmt.Printf("\n")
 }
