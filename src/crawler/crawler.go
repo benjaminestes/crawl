@@ -113,20 +113,28 @@ func crawlFetch(c *Crawler) crawlfn {
 
 		// Process response and fill node
 
+		// Process header fields
 		for k := range resp.Header {
 			r.Response.Header = append(r.Response.Header, &Pair{k, resp.Header.Get(k)})
 		}
 
+		// Populate response fields
 		r.Response.ContentLength = resp.ContentLength
 		r.Response.Status = resp.Status
 		r.Response.StatusCode = resp.StatusCode
 		r.Response.Proto = resp.Proto
 		r.Response.ProtoMajor = resp.ProtoMajor
 		r.Response.ProtoMinor = resp.ProtoMinor
+
+		// Populate Content fields
 		scrape(r, tree)
 
+		// Populate Hreflang fields
+		r.Hreflang = getHreflang(r.URL, tree)
+
+		// Populate and update links
 		c.newlist = getLinks(r.URL, tree)
-		r.Links = c.newlist
+		r.Links = c.newlist // Dangerous possibility of mutation?
 	} else {
 		r.Response.Status = "Blocked by robots.txt"
 	}

@@ -40,6 +40,7 @@ type Result struct {
 		ContentLength int64
 		Header        []*Pair
 	}
-	Links []*Link
+	Links    []*Link
+	Hreflang []*Hreflang
 	*Address
 }
