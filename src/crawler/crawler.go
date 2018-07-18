@@ -162,15 +162,16 @@ func crawlFetch(c *Crawler) crawlfn {
 }
 
 func crawlStart(c *Crawler) crawlfn {
-	if len(c.Queue) == 0 {
-		return nil
-	}
+	// Is this necessary?
 	return crawlFetch
 }
 
 func crawlSkip(c *Crawler) crawlfn {
 	c.Queue = c.Queue[1:]
-	c.Current = c.Queue[0]
+	if len(c.Queue) == 0 {
+		return nil
+	}
+	c.Current = c.Queue[0] // Still not sure how much this helps
 	return crawlStart
 }
 
