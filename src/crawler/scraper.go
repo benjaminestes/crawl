@@ -116,8 +116,7 @@ func getLinks(base *url.URL, n *html.Node) (links []*Link) {
 			if attr.Key == "href" {
 				url, err := url.Parse(attr.Val)
 				if err != nil {
-					links = append(links, nil)
-					return
+					break
 				}
 
 				newurl := base.ResolveReference(url)

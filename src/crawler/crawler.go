@@ -3,6 +3,7 @@ package crawler
 import (
 	"net/http"
 	"net/url"
+	"time"
 
 	"github.com/temoto/robotstxt"
 	"golang.org/x/net/html"
@@ -18,13 +19,15 @@ type Node struct {
 }
 
 type Crawler struct {
-	Base    *url.URL
-	Current *Node
-	Queue   []*Node
-	Seen    map[string]bool // Full text of address
-	results chan *Result    // FIXME: rename this, maybe?
-	newlist []*Link
-	robots  *robotstxt.RobotsData
+	Base            *url.URL
+	Current         *Node
+	Queue           []*Node
+	Seen            map[string]bool // Full text of address
+	results         chan *Result    // FIXME: rename this, maybe?
+	newlist         []*Link
+	robots          *robotstxt.RobotsData
+	LastRequestTime time.Time
+	WaitTime        time.Duration
 	*Config
 }
 
@@ -37,15 +40,20 @@ func Crawl(u string, config *Config) *Crawler {
 		Link:  MakeLink(u, "", true),
 	}
 
+	// FIXME: Should be configurable
+	// also probably handle error
+	wait, _ := time.ParseDuration("100ms")
+
 	c := &Crawler{
 		Base:    first.URL,
 		Current: first, // ←
 		Queue: []*Node{ // Only one of these should need to be set...
 			first,
 		},
-		Seen:    make(map[string]bool),
-		results: make(chan *Result),
-		Config:  config,
+		Seen:     make(map[string]bool),
+		results:  make(chan *Result),
+		Config:   config,
+		WaitTime: wait,
 	}
 	c.Seen[first.Address.FullAddress] = true
 	c.fetchRobots()
@@ -91,10 +99,20 @@ func (c *Crawler) Next() *Result {
 
 // State machine functions
 
+func crawlWait(c *Crawler) crawlfn {
+	time.Sleep(10 * time.Millisecond)
+	return crawlFetch
+}
+
 func crawlFetch(c *Crawler) crawlfn {
 	if c.Current.URL.Host != c.Base.Host {
 		return crawlSkip
 	}
+
+	if time.Since(c.LastRequestTime) < c.WaitTime {
+		return crawlWait
+	}
+	c.LastRequestTime = time.Now()
 
 	// Ridiculous — split this out into functions
 	r := new(Result)

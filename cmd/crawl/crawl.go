@@ -40,6 +40,6 @@ func main() {
 		j, _ := json.Marshal(n)
 		fmt.Printf("%s\n", j)
 		count++
-		fmt.Fprintf(os.Stderr, "\r%s %d", time.Now().Format("2006/01/02 03:04:05"), count)
+		fmt.Fprintf(os.Stderr, "\r%s %d/%d", time.Now().Format("2006/01/02 03:04:05"), count, len(c.Seen))
 	}
 }
