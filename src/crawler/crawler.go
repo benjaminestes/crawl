@@ -15,6 +15,7 @@ type Config struct {
 	Include         []string
 	Exclude         []string
 	Start           string
+	RespectNofollow bool
 }
 
 type Node struct {
@@ -44,12 +45,12 @@ func Crawl(config *Config) *Crawler {
 	// This should anticipate a failure condition
 	first := &Node{
 		Depth: 0,
-		Link:  MakeLink(config.Start, "", true),
+		Link:  MakeLink(config.Start, "", false),
 	}
 
 	// FIXME: Should be configurable
 	// also probably handle error
-	wait, _ := time.ParseDuration("100ms")
+	wait, _ := time.ParseDuration("200ms")
 
 	c := &Crawler{
 		Base:    first.URL,
@@ -144,7 +145,7 @@ func crawlWait(c *Crawler) crawlfn {
 
 func crawlFetch(c *Crawler) crawlfn {
 	// What a name...
-	if !c.WillCrawl(c.Current.Address.FullAddress) {
+	if !c.WillCrawl(c.Current.Address.FullAddress) || c.Current.Nofollow {
 		return crawlSkip
 	}
 	if time.Since(c.LastRequestTime) < c.WaitTime {
@@ -155,6 +156,7 @@ func crawlFetch(c *Crawler) crawlfn {
 	// Ridiculous — split this out into functions
 	r := new(Result)
 	r.Address = c.Current.Address
+	r.Depth = c.Current.Depth
 	if c.robots.TestAgent(c.Current.URL.String(), c.Config.RobotsUserAgent) {
 		resp, err := http.Get(c.Current.URL.String())
 		if err != nil {
@@ -216,11 +218,13 @@ func crawlSkip(c *Crawler) crawlfn {
 func crawlMerge(c *Crawler) crawlfn {
 	for _, link := range c.newlist {
 		if c.Seen[link.Address.FullAddress] == false {
-			node := &Node{
-				Depth: c.Current.Depth + 1,
-				Link:  link,
+			if !link.Nofollow || !c.RespectNofollow {
+				node := &Node{
+					Depth: c.Current.Depth + 1,
+					Link:  link,
+				}
+				c.Queue = append(c.Queue, node)
 			}
-			c.Queue = append(c.Queue, node)
 			c.Seen[link.Address.FullAddress] = true
 		}
 	}

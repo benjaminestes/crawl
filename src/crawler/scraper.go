@@ -51,22 +51,27 @@ func matchAttributes(attrs map[string]string, n *html.Node) bool {
 }
 
 func findNode(name string, attrs map[string]string, n *html.Node) *html.Node {
-	if n.Type == html.ElementNode && n.Data == name {
-		// if attrs == nil {
-		// 	return n
-		//}
-		if matchAttributes(attrs, n) {
-			return n
-		}
+	if n.Type == html.ElementNode && n.Data == name && matchAttributes(attrs, n) {
+		return n
 	}
 
 	for m := n.FirstChild; m != nil; m = m.NextSibling {
-		if o := findNode(name, attrs, m); o != nil {
-			return o
-		}
+		return findNode(name, attrs, m)
 	}
 
 	return nil
+}
+
+func findNodes(name string, attrs map[string]string, n *html.Node) (nodes []*html.Node) {
+	if n.Type == html.ElementNode && n.Data == name && matchAttributes(attrs, n) {
+		nodes = append(nodes, n)
+	}
+
+	for m := n.FirstChild; m != nil; m = m.NextSibling {
+		nodes = append(nodes, findNodes(name, attrs, m)...)
+	}
+
+	return
 }
 
 func getHreflang(base *url.URL, n *html.Node) (hreflang []*Hreflang) {
@@ -83,18 +88,6 @@ func getHreflang(base *url.URL, n *html.Node) (hreflang []*Hreflang) {
 	}
 
 	return
-}
-
-func findNodes(name string, attrs map[string]string, n *html.Node) (nodes []*html.Node) {
-	if n.Type == html.ElementNode && n.Data == name && matchAttributes(attrs, n) {
-		nodes = append(nodes, n)
-	}
-
-	for m := n.FirstChild; m != nil; m = m.NextSibling {
-		nodes = append(nodes, findNodes(name, attrs, m)...)
-	}
-
-	return nodes
 }
 
 func firstTextChildOf(n *html.Node) string {
