@@ -3,6 +3,7 @@ package crawler
 import (
 	"net/http"
 	"net/url"
+	"regexp"
 	"time"
 
 	"github.com/temoto/robotstxt"
@@ -11,6 +12,8 @@ import (
 
 type Config struct {
 	RobotsUserAgent string
+	Include         []string
+	Exclude         []string
 }
 
 type Node struct {
@@ -28,6 +31,9 @@ type Crawler struct {
 	robots          *robotstxt.RobotsData
 	LastRequestTime time.Time
 	WaitTime        time.Duration
+	include         []*regexp.Regexp
+	exclude         []*regexp.Regexp
+
 	*Config
 }
 
@@ -61,6 +67,35 @@ func Crawl(u string, config *Config) *Crawler {
 	return c
 }
 
+// Methods
+
+func (c *Crawler) preparePatterns(include, exclude []string) {
+	for _, s := range include {
+		p := regexp.MustCompile(s)
+		c.include = append(c.include, p)
+	}
+	for _, s := range exclude {
+		p := regexp.MustCompile(s)
+		c.exclude = append(c.exclude, p)
+	}
+}
+
+func (c *Crawler) WillCrawl(u string) bool { // Should this test addresses?
+	for _, p := range c.include {
+		if p.MatchString(u) {
+			return true
+		}
+	}
+
+	for _, p := range c.exclude {
+		if p.MatchString(u) {
+			return false
+		}
+	}
+
+	return true
+}
+
 func (c *Crawler) fetchRobots() {
 	resp, err := http.Get(c.Base.Scheme + "://" + c.Base.Host + "/robots.txt")
 	if err != nil {
@@ -75,8 +110,6 @@ func (c *Crawler) fetchRobots() {
 
 	c.robots = robots
 }
-
-// Methods
 
 func (c *Crawler) emit(n *Result) {
 	c.results <- n
@@ -105,10 +138,6 @@ func crawlWait(c *Crawler) crawlfn {
 }
 
 func crawlFetch(c *Crawler) crawlfn {
-	if c.Current.URL.Host != c.Base.Host {
-		return crawlSkip
-	}
-
 	if time.Since(c.LastRequestTime) < c.WaitTime {
 		return crawlWait
 	}

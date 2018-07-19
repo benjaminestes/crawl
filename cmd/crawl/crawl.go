@@ -43,9 +43,10 @@ func main() {
 		count++
 		fmt.Fprintf(
 			os.Stderr,
-			"\r%s %d crawled / %d seen",
+			"\r%s : %d crawled : %d queued : %d seen",
 			time.Since(start).Round(time.Second),
 			count,
+			len(c.Queue),
 			len(c.Seen),
 		)
 	}
