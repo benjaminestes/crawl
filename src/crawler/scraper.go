@@ -56,7 +56,9 @@ func findNode(name string, attrs map[string]string, n *html.Node) *html.Node {
 	}
 
 	for m := n.FirstChild; m != nil; m = m.NextSibling {
-		return findNode(name, attrs, m)
+		if o := findNode(name, attrs, m); o != nil {
+			return o
+		}
 	}
 
 	return nil
