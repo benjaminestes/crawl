@@ -14,6 +14,7 @@ type Config struct {
 	RobotsUserAgent string
 	Include         []string
 	Exclude         []string
+	Start           string
 }
 
 type Node struct {
@@ -39,11 +40,11 @@ type Crawler struct {
 
 type crawlfn func(*Crawler) crawlfn
 
-func Crawl(u string, config *Config) *Crawler {
+func Crawl(config *Config) *Crawler {
 	// This should anticipate a failure condition
 	first := &Node{
 		Depth: 0,
-		Link:  MakeLink(u, "", true),
+		Link:  MakeLink(config.Start, "", true),
 	}
 
 	// FIXME: Should be configurable
@@ -61,6 +62,7 @@ func Crawl(u string, config *Config) *Crawler {
 		Config:   config,
 		WaitTime: wait,
 	}
+	c.preparePatterns(config.Include, config.Exclude)
 	c.Seen[first.Address.FullAddress] = true
 	c.fetchRobots()
 	go c.run()
@@ -93,6 +95,9 @@ func (c *Crawler) WillCrawl(u string) bool { // Should this test addresses?
 		}
 	}
 
+	if len(c.include) > 0 {
+		return false
+	}
 	return true
 }
 
@@ -138,6 +143,10 @@ func crawlWait(c *Crawler) crawlfn {
 }
 
 func crawlFetch(c *Crawler) crawlfn {
+	// What a name...
+	if !c.WillCrawl(c.Current.Address.FullAddress) {
+		return crawlSkip
+	}
 	if time.Since(c.LastRequestTime) < c.WaitTime {
 		return crawlWait
 	}

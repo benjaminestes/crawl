@@ -21,19 +21,13 @@ func main() {
 		log.Fatal(err)
 	}
 
-	if len(os.Args) == 0 {
-		fmt.Println("Please provide a base URL.")
-		os.Exit(0)
-	}
-
-	url := os.Args[1]
-
 	err = json.Unmarshal(configJSON, config)
 	if err != nil {
 		fmt.Println("config error")
 		os.Exit(0)
 	}
-	c := crawler.Crawl(url, config)
+
+	c := crawler.Crawl(config)
 
 	count := 0
 	start := time.Now()

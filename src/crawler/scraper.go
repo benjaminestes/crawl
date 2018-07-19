@@ -124,7 +124,7 @@ func getLinks(base *url.URL, n *html.Node) (links []*Link) {
 				link := MakeLink(
 					newurl.String(),
 					firstTextChildOf(n),
-					attributeValue("rel") == "nofollow", // FIXME: Trim whitespace
+					attributeValue("rel", n) == "nofollow", // FIXME: Trim whitespace
 				) // FIXME: get actual field values
 				links = append(links, link)
 			}
