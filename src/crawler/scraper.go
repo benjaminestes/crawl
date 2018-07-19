@@ -120,8 +120,12 @@ func getLinks(base *url.URL, n *html.Node) (links []*Link) {
 				}
 
 				newurl := base.ResolveReference(url)
-				newurl.Fragment = ""                        // Ignore fragments
-				link := MakeLink(newurl.String(), "", true) // FIXME: get actual field values
+				newurl.Fragment = "" // Ignore fragments
+				link := MakeLink(
+					newurl.String(),
+					firstTextChildOf(n),
+					attributeValue("rel") == "nofollow", // FIXME: Trim whitespace
+				) // FIXME: get actual field values
 				links = append(links, link)
 			}
 		}
