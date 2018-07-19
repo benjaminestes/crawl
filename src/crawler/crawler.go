@@ -35,7 +35,7 @@ type Crawler struct {
 	WaitTime        time.Duration
 	include         []*regexp.Regexp
 	exclude         []*regexp.Regexp
-
+	client          *http.Client
 	*Config
 }
 
@@ -62,6 +62,11 @@ func Crawl(config *Config) *Crawler {
 		results:  make(chan *Result),
 		Config:   config,
 		WaitTime: wait,
+		client: &http.Client{
+			CheckRedirect: func(req *http.Request, via []*http.Request) error {
+				return http.ErrUseLastResponse
+			},
+		},
 	}
 	c.preparePatterns(config.Include, config.Exclude)
 	c.Seen[first.Address.FullAddress] = true
@@ -158,7 +163,7 @@ func crawlFetch(c *Crawler) crawlfn {
 	r.Address = c.Current.Address
 	r.Depth = c.Current.Depth
 	if c.robots.TestAgent(c.Current.URL.String(), c.Config.RobotsUserAgent) {
-		resp, err := http.Get(c.Current.URL.String())
+		resp, err := c.client.Get(c.Current.URL.String())
 		if err != nil {
 			return nil
 		}
