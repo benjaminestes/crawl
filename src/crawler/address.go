@@ -19,6 +19,9 @@ func (l *Address) SetURL(u string) {
 		// FIXME: Handle error condition
 		return
 	}
+	if url.Path == "" {
+		url.Path = "/"
+	}
 	l.URL = url
 	l.FullAddress = l.URL.String()
 }
