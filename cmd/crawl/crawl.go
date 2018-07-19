@@ -45,5 +45,5 @@ func main() {
 		)
 	}
 
-	fmt.Printf("\n")
+	fmt.Fprintf(os.Stderr, "\n")
 }
