@@ -6,6 +6,7 @@ import (
 	"io/ioutil"
 	"log"
 	"os"
+	"strings"
 	"time"
 
 	"github.com/benjaminestes/crawl/src/crawler"
@@ -36,6 +37,7 @@ func main() {
 		j, _ := json.Marshal(n)
 		fmt.Printf("%s\n", j)
 		count++
+		fmt.Fprintf(os.Stderr, "\r%s", strings.Repeat(" ", 65))
 		fmt.Fprintf(
 			os.Stderr,
 			"\r%s : %d crawled : %d queued : %d seen",
