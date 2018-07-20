@@ -1,8 +1,10 @@
 package crawler
 
 import (
+	"fmt"
 	"net/http"
 	"net/url"
+	"os"
 	"regexp"
 	"time"
 
@@ -16,6 +18,7 @@ type Config struct {
 	Exclude         []string
 	Start           string
 	RespectNofollow bool
+	WaitTime        string
 }
 
 type Node struct {
@@ -32,7 +35,7 @@ type Crawler struct {
 	newlist         []*Link
 	robots          *robotstxt.RobotsData
 	LastRequestTime time.Time
-	WaitTime        time.Duration
+	wait            time.Duration
 	include         []*regexp.Regexp
 	exclude         []*regexp.Regexp
 	client          *http.Client
@@ -50,7 +53,7 @@ func Crawl(config *Config) *Crawler {
 
 	// FIXME: Should be configurable
 	// also probably handle error
-	wait, _ := time.ParseDuration("200ms")
+	wait, _ := time.ParseDuration(config.WaitTime)
 
 	c := &Crawler{
 		Base:    first.URL,
@@ -58,10 +61,10 @@ func Crawl(config *Config) *Crawler {
 		Queue: []*Node{ // Only one of these should need to be set...
 			first,
 		},
-		Seen:     make(map[string]bool),
-		results:  make(chan *Result),
-		Config:   config,
-		WaitTime: wait,
+		Seen:    make(map[string]bool),
+		results: make(chan *Result),
+		Config:  config,
+		wait:    wait,
 		client: &http.Client{
 			CheckRedirect: func(req *http.Request, via []*http.Request) error {
 				return http.ErrUseLastResponse
@@ -152,11 +155,20 @@ func crawlStart(c *Crawler) crawlfn {
 	switch {
 	case !c.WillCrawl(c.Current.Address.FullAddress) || c.Current.Nofollow:
 		return crawlSkip
-	case time.Since(c.LastRequestTime) < c.WaitTime:
+	case time.Since(c.LastRequestTime) < c.wait:
 		return crawlWait
 	default:
 		return crawlFetch
 	}
+}
+
+func crawlSkip(c *Crawler) crawlfn {
+	c.Queue = c.Queue[1:]
+	if len(c.Queue) == 0 {
+		return nil
+	}
+	c.Current = c.Queue[0] // Still not sure how much this helps
+	return crawlStart
 }
 
 func crawlFetch(c *Crawler) crawlfn {
@@ -169,13 +181,15 @@ func crawlFetch(c *Crawler) crawlfn {
 	if c.robots.TestAgent(c.Current.URL.String(), c.Config.RobotsUserAgent) {
 		resp, err := c.client.Get(c.Current.URL.String())
 		if err != nil {
-			return nil
+			fmt.Fprintf(os.Stderr, "Couldn't fetch %s\n", c.Current.Address)
+			return crawlSkip
 		}
 		defer resp.Body.Close()
 
 		tree, err := html.Parse(resp.Body)
 		if err != nil {
-			return nil
+			fmt.Fprintf(os.Stderr, "Couldn't parse %s\n", c.Current.Address)
+			return crawlSkip
 		}
 
 		// Process response and fill node
@@ -202,21 +216,17 @@ func crawlFetch(c *Crawler) crawlfn {
 		// Populate and update links
 		c.newlist = getLinks(r.URL, tree)
 		r.Links = c.newlist // Dangerous possibility of mutation?
+
+		// If redirect, add target to list
+		if resp.StatusCode >= 300 && resp.StatusCode < 400 {
+			c.newlist = append(c.newlist, MakeLink(resp.Header.Get("Location"), "", false))
+		}
 	} else {
 		r.Response.Status = "Blocked by robots.txt"
 	}
 
 	c.emit(r)
 	return crawlMerge
-}
-
-func crawlSkip(c *Crawler) crawlfn {
-	c.Queue = c.Queue[1:]
-	if len(c.Queue) == 0 {
-		return nil
-	}
-	c.Current = c.Queue[0] // Still not sure how much this helps
-	return crawlStart
 }
 
 func crawlMerge(c *Crawler) crawlfn {
