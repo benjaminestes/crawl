@@ -148,14 +148,18 @@ func crawlWait(c *Crawler) crawlfn {
 	return crawlFetch
 }
 
-func crawlFetch(c *Crawler) crawlfn {
-	// What a name...
-	if !c.WillCrawl(c.Current.Address.FullAddress) || c.Current.Nofollow {
+func crawlStart(c *Crawler) crawlfn {
+	switch {
+	case !c.WillCrawl(c.Current.Address.FullAddress) || c.Current.Nofollow:
 		return crawlSkip
-	}
-	if time.Since(c.LastRequestTime) < c.WaitTime {
+	case time.Since(c.LastRequestTime) < c.WaitTime:
 		return crawlWait
+	default:
+		return crawlFetch
 	}
+}
+
+func crawlFetch(c *Crawler) crawlfn {
 	c.LastRequestTime = time.Now()
 
 	// Ridiculous — split this out into functions
@@ -204,11 +208,6 @@ func crawlFetch(c *Crawler) crawlfn {
 
 	c.emit(r)
 	return crawlMerge
-}
-
-func crawlStart(c *Crawler) crawlfn {
-	// Is this necessary?
-	return crawlFetch
 }
 
 func crawlSkip(c *Crawler) crawlfn {
