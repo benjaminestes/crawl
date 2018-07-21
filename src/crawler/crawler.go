@@ -31,7 +31,8 @@ type Crawler struct {
 	Current         *Node
 	Queue           []*Node
 	Seen            map[string]bool // Full text of address
-	results         chan *Result    // FIXME: rename this, maybe?
+	results         chan *Result
+	result          *Result
 	newlist         []*Link
 	robots          *robotstxt.RobotsData
 	LastRequestTime time.Time
@@ -125,8 +126,8 @@ func (c *Crawler) fetchRobots() {
 	c.robots = robots
 }
 
-func (c *Crawler) emit(n *Result) {
-	c.results <- n
+func (c *Crawler) emit() {
+	c.results <- c.result
 }
 
 func (c *Crawler) run() {
@@ -152,7 +153,7 @@ func (c *Crawler) resetWait() {
 
 func crawlWait(c *Crawler) crawlfn {
 	time.Sleep(10 * time.Millisecond)
-	return crawlFetch
+	return crawlTryFetch
 }
 
 func crawlStart(c *Crawler) crawlfn {
@@ -165,7 +166,7 @@ func crawlStart(c *Crawler) crawlfn {
 	case time.Since(c.LastRequestTime) < c.wait:
 		return crawlWait
 	default:
-		return crawlFetch
+		return crawlTryFetch
 	}
 }
 
@@ -178,19 +179,20 @@ func crawlSkip(c *Crawler) crawlfn {
 	return crawlStart
 }
 
-func crawlFetch(c *Crawler) crawlfn {
-	c.resetWait()
-
-	// Ridiculous — split this out into functions
-	r := new(Result)
-	r.Address = c.Current.Address
-	r.Depth = c.Current.Depth
-
+func crawlTryFetch(c *Crawler) crawlfn {
 	if !c.robots.TestAgent(c.Current.URL.String(), c.Config.RobotsUserAgent) {
-		r.Response.Status = "Blocked by robots.txt"
-		c.emit(r)
+		c.result = MakeResult(c.Current.Address, c.Current.Depth)
+		c.result.Response.Status = "Blocked by robots.txt"
+		c.emit()
 		return crawlSkip
 	}
+	return crawlDoFetch
+}
+
+func crawlDoFetch(c *Crawler) crawlfn {
+	c.resetWait()
+
+	c.result = MakeResult(c.Current.Address, c.Current.Depth)
 
 	resp, err := c.client.Get(c.Current.URL.String())
 	if err != nil {
@@ -205,37 +207,15 @@ func crawlFetch(c *Crawler) crawlfn {
 		return crawlSkip
 	}
 
-	// Process response and fill node
-
-	// Process header fields
-	for k := range resp.Header {
-		r.Response.Header = append(r.Response.Header, &Pair{k, resp.Header.Get(k)})
-	}
-
-	// Populate response fields
-	r.Response.ContentLength = resp.ContentLength
-	r.Response.Status = resp.Status
-	r.Response.StatusCode = resp.StatusCode
-	r.Response.Proto = resp.Proto
-	r.Response.ProtoMajor = resp.ProtoMajor
-	r.Response.ProtoMinor = resp.ProtoMinor
-
-	// Populate Content fields
-	scrape(r, tree)
-
-	// Populate Hreflang fields
-	r.Hreflang = getHreflang(r.URL, tree)
-
-	// Populate and update links
-	c.newlist = getLinks(r.URL, tree)
-	r.Links = c.newlist
+	c.result.Hydrate(resp, tree)
+	c.newlist = c.result.Links
 
 	// If redirect, add target to list
 	if resp.StatusCode >= 300 && resp.StatusCode < 400 {
 		c.newlist = append(c.newlist, MakeLink(resp.Header.Get("Location"), "", false))
 	}
 
-	c.emit(r)
+	c.emit()
 	return crawlMerge
 }
 
