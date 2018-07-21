@@ -144,6 +144,10 @@ func (c *Crawler) Next() *Result {
 	return node
 }
 
+func (c *Crawler) resetWait() {
+	c.LastRequestTime = time.Now()
+}
+
 // State machine functions
 
 func crawlWait(c *Crawler) crawlfn {
@@ -154,6 +158,9 @@ func crawlWait(c *Crawler) crawlfn {
 func crawlStart(c *Crawler) crawlfn {
 	switch {
 	case !c.WillCrawl(c.Current.Address.FullAddress) || c.Current.Nofollow:
+		// If a URL does not match our include and exclude patterns,
+		// or it was pointed to by a nofollow link, there will be
+		// no result for it.
 		return crawlSkip
 	case time.Since(c.LastRequestTime) < c.wait:
 		return crawlWait
@@ -172,7 +179,7 @@ func crawlSkip(c *Crawler) crawlfn {
 }
 
 func crawlFetch(c *Crawler) crawlfn {
-	c.LastRequestTime = time.Now()
+	c.resetWait()
 
 	// Ridiculous — split this out into functions
 	r := new(Result)
