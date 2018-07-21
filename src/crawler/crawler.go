@@ -153,7 +153,7 @@ func (c *Crawler) resetWait() {
 
 func crawlWait(c *Crawler) crawlfn {
 	time.Sleep(10 * time.Millisecond)
-	return crawlTryFetch
+	return crawlFetch
 }
 
 func crawlStart(c *Crawler) crawlfn {
@@ -162,15 +162,18 @@ func crawlStart(c *Crawler) crawlfn {
 		// If a URL does not match our include and exclude patterns,
 		// or it was pointed to by a nofollow link, there will be
 		// no result for it.
-		return crawlSkip
+		return crawlNext
+	// FIXME: Test for robots.txt of domain of current URL
+	case !c.robots.TestAgent(c.Current.URL.String(), c.Config.RobotsUserAgent):
+		return crawlRobotsBlocked
 	case time.Since(c.LastRequestTime) < c.wait:
 		return crawlWait
 	default:
-		return crawlTryFetch
+		return crawlFetch
 	}
 }
 
-func crawlSkip(c *Crawler) crawlfn {
+func crawlNext(c *Crawler) crawlfn {
 	c.Queue = c.Queue[1:]
 	if len(c.Queue) == 0 {
 		return nil
@@ -179,17 +182,14 @@ func crawlSkip(c *Crawler) crawlfn {
 	return crawlStart
 }
 
-func crawlTryFetch(c *Crawler) crawlfn {
-	if !c.robots.TestAgent(c.Current.URL.String(), c.Config.RobotsUserAgent) {
-		c.result = MakeResult(c.Current.Address, c.Current.Depth)
-		c.result.Response.Status = "Blocked by robots.txt"
-		c.emit()
-		return crawlSkip
-	}
-	return crawlDoFetch
+func crawlRobotsBlocked(c *Crawler) crawlfn {
+	c.result = MakeResult(c.Current.Address, c.Current.Depth)
+	c.result.Response.Status = "Blocked by robots.txt"
+	c.emit()
+	return crawlNext
 }
 
-func crawlDoFetch(c *Crawler) crawlfn {
+func crawlFetch(c *Crawler) crawlfn {
 	c.resetWait()
 
 	c.result = MakeResult(c.Current.Address, c.Current.Depth)
@@ -197,14 +197,14 @@ func crawlDoFetch(c *Crawler) crawlfn {
 	resp, err := c.client.Get(c.Current.URL.String())
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "Couldn't fetch %s\n", c.Current.Address)
-		return crawlSkip
+		return crawlNext
 	}
 	defer resp.Body.Close()
 
 	tree, err := html.Parse(resp.Body)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "Couldn't parse %s\n", c.Current.Address)
-		return crawlSkip
+		return crawlNext
 	}
 
 	c.result.Hydrate(resp, tree)
@@ -212,7 +212,7 @@ func crawlDoFetch(c *Crawler) crawlfn {
 
 	// If redirect, add target to list
 	if resp.StatusCode >= 300 && resp.StatusCode < 400 {
-		c.newlist = append(c.newlist, MakeLink(resp.Header.Get("Location"), "", false))
+		c.newlist = []*Link{MakeLink(resp.Header.Get("Location"), "", false)}
 	}
 
 	c.emit()
@@ -222,7 +222,7 @@ func crawlDoFetch(c *Crawler) crawlfn {
 func crawlMerge(c *Crawler) crawlfn {
 	for _, link := range c.newlist {
 		if c.Seen[link.Address.FullAddress] == false {
-			if !link.Nofollow || !c.RespectNofollow {
+			if !(link.Nofollow && c.RespectNofollow) {
 				node := &Node{
 					Depth: c.Current.Depth + 1,
 					Link:  link,
@@ -232,5 +232,5 @@ func crawlMerge(c *Crawler) crawlfn {
 			c.Seen[link.Address.FullAddress] = true
 		}
 	}
-	return crawlSkip
+	return crawlNext
 }
