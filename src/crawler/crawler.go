@@ -178,51 +178,54 @@ func crawlFetch(c *Crawler) crawlfn {
 	r := new(Result)
 	r.Address = c.Current.Address
 	r.Depth = c.Current.Depth
-	if c.robots.TestAgent(c.Current.URL.String(), c.Config.RobotsUserAgent) {
-		resp, err := c.client.Get(c.Current.URL.String())
-		if err != nil {
-			fmt.Fprintf(os.Stderr, "Couldn't fetch %s\n", c.Current.Address)
-			return crawlSkip
-		}
-		defer resp.Body.Close()
 
-		tree, err := html.Parse(resp.Body)
-		if err != nil {
-			fmt.Fprintf(os.Stderr, "Couldn't parse %s\n", c.Current.Address)
-			return crawlSkip
-		}
-
-		// Process response and fill node
-
-		// Process header fields
-		for k := range resp.Header {
-			r.Response.Header = append(r.Response.Header, &Pair{k, resp.Header.Get(k)})
-		}
-
-		// Populate response fields
-		r.Response.ContentLength = resp.ContentLength
-		r.Response.Status = resp.Status
-		r.Response.StatusCode = resp.StatusCode
-		r.Response.Proto = resp.Proto
-		r.Response.ProtoMajor = resp.ProtoMajor
-		r.Response.ProtoMinor = resp.ProtoMinor
-
-		// Populate Content fields
-		scrape(r, tree)
-
-		// Populate Hreflang fields
-		r.Hreflang = getHreflang(r.URL, tree)
-
-		// Populate and update links
-		c.newlist = getLinks(r.URL, tree)
-		r.Links = c.newlist // Dangerous possibility of mutation?
-
-		// If redirect, add target to list
-		if resp.StatusCode >= 300 && resp.StatusCode < 400 {
-			c.newlist = append(c.newlist, MakeLink(resp.Header.Get("Location"), "", false))
-		}
-	} else {
+	if !c.robots.TestAgent(c.Current.URL.String(), c.Config.RobotsUserAgent) {
 		r.Response.Status = "Blocked by robots.txt"
+		c.emit(r)
+		return crawlSkip
+	}
+
+	resp, err := c.client.Get(c.Current.URL.String())
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "Couldn't fetch %s\n", c.Current.Address)
+		return crawlSkip
+	}
+	defer resp.Body.Close()
+
+	tree, err := html.Parse(resp.Body)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "Couldn't parse %s\n", c.Current.Address)
+		return crawlSkip
+	}
+
+	// Process response and fill node
+
+	// Process header fields
+	for k := range resp.Header {
+		r.Response.Header = append(r.Response.Header, &Pair{k, resp.Header.Get(k)})
+	}
+
+	// Populate response fields
+	r.Response.ContentLength = resp.ContentLength
+	r.Response.Status = resp.Status
+	r.Response.StatusCode = resp.StatusCode
+	r.Response.Proto = resp.Proto
+	r.Response.ProtoMajor = resp.ProtoMajor
+	r.Response.ProtoMinor = resp.ProtoMinor
+
+	// Populate Content fields
+	scrape(r, tree)
+
+	// Populate Hreflang fields
+	r.Hreflang = getHreflang(r.URL, tree)
+
+	// Populate and update links
+	c.newlist = getLinks(r.URL, tree)
+	r.Links = c.newlist
+
+	// If redirect, add target to list
+	if resp.StatusCode >= 300 && resp.StatusCode < 400 {
+		c.newlist = append(c.newlist, MakeLink(resp.Header.Get("Location"), "", false))
 	}
 
 	c.emit(r)
