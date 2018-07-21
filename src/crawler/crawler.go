@@ -27,14 +27,13 @@ type Node struct {
 }
 
 type Crawler struct {
-	Base            *url.URL
 	Current         *Node
 	Queue           []*Node
 	Seen            map[string]bool // Full text of address
 	results         chan *Result
 	result          *Result
 	newlist         []*Link
-	robots          *robotstxt.RobotsData
+	robots          map[string]*robotstxt.RobotsData
 	LastRequestTime time.Time
 	wait            time.Duration
 	include         []*regexp.Regexp
@@ -57,7 +56,6 @@ func Crawl(config *Config) *Crawler {
 	wait, _ := time.ParseDuration(config.WaitTime)
 
 	c := &Crawler{
-		Base:    first.URL,
 		Current: first, // ←
 		Queue: []*Node{ // Only one of these should need to be set...
 			first,
@@ -71,10 +69,10 @@ func Crawl(config *Config) *Crawler {
 				return http.ErrUseLastResponse
 			},
 		},
+		robots: make(map[string]*robotstxt.RobotsData),
 	}
 	c.preparePatterns(config.Include, config.Exclude)
 	c.Seen[first.Address.FullAddress] = true
-	c.fetchRobots()
 	go c.run()
 	return c
 }
@@ -111,19 +109,25 @@ func (c *Crawler) WillCrawl(u string) bool { // Should this test addresses?
 	return true
 }
 
-func (c *Crawler) fetchRobots() {
-	resp, err := http.Get(c.Base.Scheme + "://" + c.Base.Host + "/robots.txt")
+func (c *Crawler) addRobots(u string) {
+	url, err := url.Parse(u)
+	if err != nil {
+		return
+	}
+
+	// No matter what, make an entry for this host
+	// That way we know we've check at least once
+
+	c.robots[url.Host] = nil
+
+	resp, err := c.client.Get(url.Scheme + "://" + url.Host + "/robots.txt")
 	if err != nil {
 		return
 	}
 	defer resp.Body.Close()
 
-	robots, err := robotstxt.FromResponse(resp)
-	if err != nil {
-		return
-	}
-
-	c.robots = robots
+	robots, _ := robotstxt.FromResponse(resp)
+	c.robots[url.Host] = robots
 }
 
 func (c *Crawler) emit() {
@@ -156,6 +160,13 @@ func crawlWait(c *Crawler) crawlfn {
 	return crawlFetch
 }
 
+func crawlAddRobots(c *Crawler) crawlfn {
+	// Crawler already has this state — does it need to be passed?
+	c.addRobots(c.Current.URL.String())
+	fmt.Fprintf(os.Stderr, "%s\n", "Check robots.txt for: "+c.Current.URL.Host)
+	return crawlStart
+}
+
 func crawlStart(c *Crawler) crawlfn {
 	switch {
 	case !c.WillCrawl(c.Current.Address.FullAddress) || c.Current.Nofollow:
@@ -163,8 +174,15 @@ func crawlStart(c *Crawler) crawlfn {
 		// or it was pointed to by a nofollow link, there will be
 		// no result for it.
 		return crawlNext
+	case c.robots[c.Current.URL.Host] == nil:
+		if _, ok := c.robots[c.Current.URL.Host]; !ok {
+			// We haven't read robots.txt for the current domain!
+			return crawlAddRobots
+		}
+		// We previously failed to find a robots file!
+		return crawlFetch
 	// FIXME: Test for robots.txt of domain of current URL
-	case !c.robots.TestAgent(c.Current.URL.String(), c.Config.RobotsUserAgent):
+	case !c.robots[c.Current.URL.Host].TestAgent(c.Current.URL.String(), c.Config.RobotsUserAgent):
 		return crawlRobotsBlocked
 	case time.Since(c.LastRequestTime) < c.wait:
 		return crawlWait
