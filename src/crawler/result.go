@@ -14,9 +14,8 @@ type Pair struct {
 }
 
 type Result struct {
-	*Address
-
 	// Crawler state
+	*Address
 	Depth int
 
 	// Content
