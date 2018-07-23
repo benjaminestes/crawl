@@ -14,21 +14,27 @@ type Pair struct {
 }
 
 type Result struct {
-	Depth       int
+	*Address
+
+	// Crawler state
+	Depth int
+
+	// Content
 	Description string
 	Title       string
 	H1          string
 	Robots      string
 	Canonical   string
-	Status      string
-	StatusCode  int
-	Proto       string
-	ProtoMajor  int
-	ProtoMinor  int
-	Header      []*Pair
 	Links       []*Link
 	Hreflang    []*Hreflang
-	*Address
+
+	// Response
+	Status     string
+	StatusCode int
+	Proto      string
+	ProtoMajor int
+	ProtoMinor int
+	Header     []*Pair
 }
 
 func MakeResult(addr *Address, depth int) *Result {
