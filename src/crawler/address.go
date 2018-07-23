@@ -3,7 +3,7 @@ package crawler
 import "net/url"
 
 type Address struct {
-	FullAddress string
+	Address string
 	*url.URL
 }
 
@@ -23,5 +23,5 @@ func (l *Address) SetURL(u string) {
 		url.Path = "/"
 	}
 	l.URL = url
-	l.FullAddress = l.URL.String()
+	l.Address = l.URL.String()
 }

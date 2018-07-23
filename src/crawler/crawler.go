@@ -72,7 +72,7 @@ func Crawl(config *Config) *Crawler {
 		robots: make(map[string]*robotstxt.RobotsData),
 	}
 	c.preparePatterns(config.Include, config.Exclude)
-	c.Seen[first.Address.FullAddress] = true
+	c.Seen[first.Address.Address] = true
 	go c.run()
 	return c
 }
@@ -169,7 +169,7 @@ func crawlAddRobots(c *Crawler) crawlfn {
 
 func crawlStart(c *Crawler) crawlfn {
 	switch {
-	case !c.WillCrawl(c.Current.Address.FullAddress) || c.Current.Nofollow:
+	case !c.WillCrawl(c.Current.Address.Address) || c.Current.Nofollow:
 		// If a URL does not match our include and exclude patterns,
 		// or it was pointed to by a nofollow link, there will be
 		// no result for it.
@@ -202,7 +202,7 @@ func crawlNext(c *Crawler) crawlfn {
 
 func crawlRobotsBlocked(c *Crawler) crawlfn {
 	c.result = MakeResult(c.Current.Address, c.Current.Depth)
-	c.result.Response.Status = "Blocked by robots.txt"
+	c.result.Status = "Blocked by robots.txt"
 	c.emit()
 	return crawlNext
 }
@@ -239,7 +239,7 @@ func crawlFetch(c *Crawler) crawlfn {
 
 func crawlMerge(c *Crawler) crawlfn {
 	for _, link := range c.newlist {
-		if c.Seen[link.Address.FullAddress] == false {
+		if c.Seen[link.Address.Address] == false {
 			if !(link.Nofollow && c.RespectNofollow) {
 				node := &Node{
 					Depth: c.Current.Depth + 1,
@@ -247,7 +247,7 @@ func crawlMerge(c *Crawler) crawlfn {
 				}
 				c.Queue = append(c.Queue, node)
 			}
-			c.Seen[link.Address.FullAddress] = true
+			c.Seen[link.Address.Address] = true
 		}
 	}
 	return crawlNext
