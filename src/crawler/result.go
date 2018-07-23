@@ -45,39 +45,35 @@ func MakeResult(addr *Address, depth int) *Result {
 }
 
 func (r *Result) Hydrate(resp *http.Response, doc *html.Node) {
+	hydrateHeader(r, resp)
+	hydrateContent(r, doc)
+}
+
+func hydrateHeader(r *Result, resp *http.Response) {
 	for k := range resp.Header {
 		r.Header = append(r.Header, &Pair{k, resp.Header.Get(k)})
 	}
-
-	// Populate response fields
 	r.Status = resp.Status
 	r.StatusCode = resp.StatusCode
 	r.Proto = resp.Proto
 	r.ProtoMajor = resp.ProtoMajor
 	r.ProtoMinor = resp.ProtoMinor
-
-	// Populate Content fields
-	scrapeResult(r, doc)
-
-	// Populate Hreflang fields
-	r.Hreflang = getHreflang(r.URL, doc)
-
-	// Populate and update links
-	r.Links = getLinks(r.URL, doc)
 }
 
-func scrapeResult(n *Result, doc *html.Node) {
-	n.Title = scrape.GetText(scrape.QueryNode("title", nil, doc))
-	n.H1 = scrape.GetText(scrape.QueryNode("h1", nil, doc))
-	n.Description = scrape.GetAttribute("content", scrape.QueryNode("meta", map[string]string{
+func hydrateContent(r *Result, doc *html.Node) {
+	r.Title = scrape.GetText(scrape.QueryNode("title", nil, doc))
+	r.H1 = scrape.GetText(scrape.QueryNode("h1", nil, doc))
+	r.Description = scrape.GetAttribute("content", scrape.QueryNode("meta", map[string]string{
 		"name": "description",
 	}, doc))
-	n.Robots = scrape.GetAttribute("content", scrape.QueryNode("meta", map[string]string{
+	r.Robots = scrape.GetAttribute("content", scrape.QueryNode("meta", map[string]string{
 		"name": "robots",
 	}, doc))
-	n.Canonical = scrape.GetAttribute("href", scrape.QueryNode("link", map[string]string{
+	r.Canonical = scrape.GetAttribute("href", scrape.QueryNode("link", map[string]string{
 		"rel": "canonical",
 	}, doc))
+	r.Hreflang = getHreflang(r.URL, doc)
+	r.Links = getLinks(r.URL, doc)
 }
 
 // FIXME: Should get the same URL resolving treatment as links
@@ -100,7 +96,10 @@ func getHreflang(base *url.URL, n *html.Node) (hreflang []*Hreflang) {
 func getLinks(base *url.URL, n *html.Node) (links []*Link) {
 	els := scrape.GetNodesByTagName("a", n)
 	for _, a := range els {
-		h, _ := url.Parse(scrape.GetAttribute("href", a))
+		h, err := url.Parse(scrape.GetAttribute("href", a))
+		if err != nil {
+			continue
+		}
 		t := base.ResolveReference(h)
 		t.Fragment = ""
 		link := MakeLink(
