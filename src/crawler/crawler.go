@@ -239,6 +239,9 @@ func crawlFetch(c *Crawler) crawlfn {
 
 func crawlMerge(c *Crawler) crawlfn {
 	for _, link := range c.newlist {
+		if link.Address == nil {
+			continue
+		}
 		if c.Seen[link.Address.Address] == false {
 			if !(link.Nofollow && c.RespectNofollow) {
 				node := &Node{
