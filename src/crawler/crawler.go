@@ -182,7 +182,7 @@ func crawlStart(c *Crawler) crawlfn {
 		// We previously failed to find a robots file!
 		return crawlFetch
 		// FIXME: Test for robots.txt of domain of current URL
-	case !c.robots[c.Current.Address.Host].TestAgent(c.Current.Address.Address, c.Config.RobotsUserAgent):
+	case !c.robots[c.Current.Address.Host].TestAgent(c.Current.Address.Path, c.Config.RobotsUserAgent):
 		return crawlRobotsBlocked
 	case time.Since(c.LastRequestTime) < c.wait:
 		return crawlWait

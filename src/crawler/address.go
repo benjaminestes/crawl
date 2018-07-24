@@ -10,7 +10,6 @@ type Address struct {
 	Path     string
 	RawPath  string
 	RawQuery string
-	Fragment string
 }
 
 // Methods
@@ -34,6 +33,7 @@ func MakeAddressFromURL(u *url.URL) *Address {
 	if u.Path == "" {
 		u.Path = "/"
 	}
+	u.Fragment = ""
 	return &Address{
 		Address:  u.String(),
 		Scheme:   u.Scheme,
@@ -42,7 +42,6 @@ func MakeAddressFromURL(u *url.URL) *Address {
 		Path:     u.Path,
 		RawPath:  u.RawPath,
 		RawQuery: u.RawQuery,
-		Fragment: u.Fragment,
 	}
 }
 
