@@ -3,6 +3,7 @@ package crawler
 import (
 	"net/http"
 	"net/url"
+	"strings"
 
 	"github.com/benjaminestes/crawl/src/scrape"
 	"golang.org/x/net/html"
@@ -45,7 +46,9 @@ func MakeResult(addr *Address, depth int) *Result {
 
 func (r *Result) Hydrate(resp *http.Response, doc *html.Node) {
 	hydrateHeader(r, resp)
-	hydrateContent(r, doc)
+	if strings.HasPrefix(resp.Header.Get("Content-Type"), "text/html") {
+		hydrateHTMLContent(r, doc)
+	}
 }
 
 func hydrateHeader(r *Result, resp *http.Response) {
@@ -59,7 +62,7 @@ func hydrateHeader(r *Result, resp *http.Response) {
 	r.ProtoMinor = resp.ProtoMinor
 }
 
-func hydrateContent(r *Result, doc *html.Node) {
+func hydrateHTMLContent(r *Result, doc *html.Node) {
 	r.Title = scrape.GetText(scrape.QueryNode("title", nil, doc))
 	r.H1 = scrape.GetText(scrape.QueryNode("h1", nil, doc))
 	r.Description = scrape.GetAttribute("content", scrape.QueryNode("meta", map[string]string{
