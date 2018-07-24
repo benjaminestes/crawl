@@ -2,14 +2,15 @@ package crawler
 
 type Hreflang struct {
 	*Address
-	Lang string
+	Href     string
+	Hreflang string
 }
 
-func MakeHreflang(address, lang string) *Hreflang {
-	l := &Hreflang{
-		Address: new(Address),
-		Lang:    lang,
+func MakeHreflang(base *Address, href, lang string) *Hreflang {
+	hreflang := &Hreflang{
+		Href:     href,
+		Hreflang: lang,
 	}
-	l.SetURL(address)
-	return l
+	hreflang.Address = MakeAddressFromRelative(base, href)
+	return hreflang
 }

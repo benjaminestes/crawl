@@ -48,7 +48,7 @@ func Crawl(config *Config) *Crawler {
 	// This should anticipate a failure condition
 	first := &Node{
 		Depth: 0,
-		Link:  MakeLink(config.Start, "", false),
+		Link:  MakeAbsoluteLink(config.Start, "", false),
 	}
 
 	// FIXME: Should be configurable
@@ -162,8 +162,8 @@ func crawlWait(c *Crawler) crawlfn {
 
 func crawlAddRobots(c *Crawler) crawlfn {
 	// Crawler already has this state — does it need to be passed?
-	c.addRobots(c.Current.URL.String())
-	fmt.Fprintf(os.Stderr, "%s\n", "Check robots.txt for: "+c.Current.URL.Host)
+	c.addRobots(c.Current.Address.Address)
+	fmt.Fprintf(os.Stderr, "%s\n", "Check robots.txt for: "+c.Current.Address.Host)
 	return crawlStart
 }
 
@@ -174,15 +174,15 @@ func crawlStart(c *Crawler) crawlfn {
 		// or it was pointed to by a nofollow link, there will be
 		// no result for it.
 		return crawlNext
-	case c.robots[c.Current.URL.Host] == nil:
-		if _, ok := c.robots[c.Current.URL.Host]; !ok {
+	case c.robots[c.Current.Address.Host] == nil:
+		if _, ok := c.robots[c.Current.Address.Host]; !ok {
 			// We haven't read robots.txt for the current domain!
 			return crawlAddRobots
 		}
 		// We previously failed to find a robots file!
 		return crawlFetch
-	// FIXME: Test for robots.txt of domain of current URL
-	case !c.robots[c.Current.URL.Host].TestAgent(c.Current.URL.String(), c.Config.RobotsUserAgent):
+		// FIXME: Test for robots.txt of domain of current URL
+	case !c.robots[c.Current.Address.Host].TestAgent(c.Current.Address.Address, c.Config.RobotsUserAgent):
 		return crawlRobotsBlocked
 	case time.Since(c.LastRequestTime) < c.wait:
 		return crawlWait
@@ -212,7 +212,7 @@ func crawlFetch(c *Crawler) crawlfn {
 
 	c.result = MakeResult(c.Current.Address, c.Current.Depth)
 
-	resp, err := c.client.Get(c.Current.URL.String())
+	resp, err := c.client.Get(c.Current.Address.Address)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "Couldn't fetch %s\n", c.Current.Address)
 		return crawlNext
@@ -230,7 +230,7 @@ func crawlFetch(c *Crawler) crawlfn {
 
 	// If redirect, add target to list
 	if resp.StatusCode >= 300 && resp.StatusCode < 400 {
-		c.newlist = []*Link{MakeLink(resp.Header.Get("Location"), "", false)}
+		c.newlist = []*Link{MakeLink(c.Current.Address, resp.Header.Get("Location"), "", false)}
 	}
 
 	c.emit()

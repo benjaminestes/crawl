@@ -3,25 +3,57 @@ package crawler
 import "net/url"
 
 type Address struct {
-	Address string
-	*url.URL
+	Address  string
+	Scheme   string
+	Opaque   string
+	Host     string
+	Path     string
+	RawPath  string
+	RawQuery string
+	Fragment string
 }
 
-func MakeAddress(u string) (a *Address) {
-	a = &Address{}
-	a.SetURL(u)
-	return
+// Methods
+
+func (a *Address) toURL() *url.URL {
+	u, _ := url.Parse(a.Address) // FIXME: use error
+	return u
 }
 
-func (l *Address) SetURL(u string) {
-	url, err := url.Parse(u)
+// Functions
+
+func MakeAddressFromString(addr string) *Address {
+	u, err := url.Parse(addr)
 	if err != nil {
-		// FIXME: Handle error condition
-		return
+		return nil
 	}
-	if url.Path == "" {
-		url.Path = "/"
+	return MakeAddressFromURL(u)
+}
+
+func MakeAddressFromURL(u *url.URL) *Address {
+	if u.Path == "" {
+		u.Path = "/"
 	}
-	l.URL = url
-	l.Address = l.URL.String()
+	return &Address{
+		Address:  u.String(),
+		Scheme:   u.Scheme,
+		Opaque:   u.Opaque,
+		Host:     u.Host,
+		Path:     u.Path,
+		RawPath:  u.RawPath,
+		RawQuery: u.RawQuery,
+		Fragment: u.Fragment,
+	}
+}
+
+func MakeAddressFromRelative(base *Address, addr string) *Address {
+	u, err := url.Parse(addr)
+	if err != nil {
+		return nil
+	}
+	t := base.toURL()
+	if t != nil {
+		return MakeAddressFromURL(t.ResolveReference(u))
+	}
+	return nil
 }

@@ -2,7 +2,6 @@ package crawler
 
 import (
 	"net/http"
-	"net/url"
 	"strings"
 
 	"github.com/benjaminestes/crawl/src/scrape"
@@ -24,7 +23,7 @@ type Result struct {
 	Title       string
 	H1          string
 	Robots      string
-	Canonical   string
+	Canonical   *Canonical
 	Links       []*Link
 	Hreflang    []*Hreflang
 
@@ -71,15 +70,20 @@ func hydrateHTMLContent(r *Result, doc *html.Node) {
 	r.Robots = scrape.GetAttribute("content", scrape.QueryNode("meta", map[string]string{
 		"name": "robots",
 	}, doc))
-	r.Canonical = scrape.GetAttribute("href", scrape.QueryNode("link", map[string]string{
+	r.Canonical = getCanonical(r.Address, doc)
+	r.Hreflang = getHreflang(r.Address, doc)
+	r.Links = getLinks(r.Address, doc)
+}
+
+func getCanonical(base *Address, n *html.Node) (c *Canonical) {
+	href := scrape.GetAttribute("href", scrape.QueryNode("link", map[string]string{
 		"rel": "canonical",
-	}, doc))
-	r.Hreflang = getHreflang(r.URL, doc)
-	r.Links = getLinks(r.URL, doc)
+	}, n))
+	return MakeCanonical(base, href)
 }
 
 // FIXME: Should get the same URL resolving treatment as links
-func getHreflang(base *url.URL, n *html.Node) (hreflang []*Hreflang) {
+func getHreflang(base *Address, n *html.Node) (hreflang []*Hreflang) {
 	nodes := scrape.QueryNodes("link", map[string]string{
 		"rel": "alternate",
 	}, n)
@@ -88,26 +92,22 @@ func getHreflang(base *url.URL, n *html.Node) (hreflang []*Hreflang) {
 		lang := scrape.GetAttribute("hreflang", n)
 		href := scrape.GetAttribute("href", n)
 		if href != "" {
-			hreflang = append(hreflang, MakeHreflang(href, lang))
+			hreflang = append(hreflang, MakeHreflang(base, href, lang))
 		}
 	}
 
 	return
 }
 
-func getLinks(base *url.URL, n *html.Node) (links []*Link) {
+func getLinks(base *Address, n *html.Node) (links []*Link) {
 	els := scrape.GetNodesByTagName("a", n)
 	for _, a := range els {
-		h, err := url.Parse(scrape.GetAttribute("href", a))
-		if err != nil {
-			continue
-		}
-		t := base.ResolveReference(h)
-		t.Fragment = ""
+		href := scrape.GetAttribute("href", a)
 		link := MakeLink(
-			t.String(),
+			base,
+			href,
 			scrape.GetText(a),
-			scrape.GetAttribute("rel", n) == "nofollow", // FIXME: Trim whitespace
+			scrape.GetAttribute("rel", n) == "nofollow", // FIXME: Trim whitespace?
 		)
 		links = append(links, link)
 	}

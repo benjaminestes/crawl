@@ -3,15 +3,21 @@ package crawler
 type Link struct {
 	*Address
 	Anchor   string
+	Href     string
 	Nofollow bool
 }
 
-func MakeLink(address string, anchor string, nofollow bool) *Link {
-	l := &Link{
-		Address:  new(Address),
+func MakeLink(base *Address, href string, anchor string, nofollow bool) *Link {
+	link := &Link{
+		Href:     href,
 		Anchor:   anchor,
 		Nofollow: nofollow,
 	}
-	l.SetURL(address)
-	return l
+	link.Address = MakeAddressFromRelative(base, href)
+	return link
+}
+
+func MakeAbsoluteLink(href string, anchor string, nofollow bool) *Link {
+	base := MakeAddressFromString(href)
+	return MakeLink(base, href, anchor, nofollow)
 }
