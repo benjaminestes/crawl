@@ -15,6 +15,7 @@ import (
 var config = &crawler.Config{
 	RobotsUserAgent: "Crawler",
 	WaitTime:        "100ms",
+	MaxDepth:        -1,
 }
 
 func main() {

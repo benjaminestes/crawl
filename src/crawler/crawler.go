@@ -18,6 +18,7 @@ type Config struct {
 	Exclude         []string
 	Start           string
 	RespectNofollow bool
+	MaxDepth        int
 	WaitTime        string
 }
 
@@ -169,6 +170,9 @@ func crawlAddRobots(c *Crawler) crawlfn {
 
 func crawlStart(c *Crawler) crawlfn {
 	switch {
+	// FIXME: put "has max depth" into a method
+	case c.Current.Depth > c.MaxDepth && c.MaxDepth >= 0:
+		return crawlNext
 	case !c.WillCrawl(c.Current.Address.Address) || c.Current.Nofollow:
 		// If a URL does not match our include and exclude patterns,
 		// or it was pointed to by a nofollow link, there will be
