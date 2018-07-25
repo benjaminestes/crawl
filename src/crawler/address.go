@@ -14,6 +14,10 @@ type Address struct {
 
 // Methods
 
+func (a *Address) String() string {
+	return a.Address
+}
+
 func (a *Address) toURL() *url.URL {
 	u, _ := url.Parse(a.Address) // FIXME: use error
 	return u

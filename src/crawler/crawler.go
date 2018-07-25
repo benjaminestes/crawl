@@ -73,7 +73,7 @@ func Crawl(config *Config) *Crawler {
 		robots: make(map[string]*robotstxt.RobotsData),
 	}
 	c.preparePatterns(config.Include, config.Exclude)
-	c.Seen[first.Address.Address] = true
+	c.Seen[first.Address.String()] = true
 	go c.run()
 	return c
 }
@@ -163,7 +163,7 @@ func crawlWait(c *Crawler) crawlfn {
 
 func crawlAddRobots(c *Crawler) crawlfn {
 	// Crawler already has this state — does it need to be passed?
-	c.addRobots(c.Current.Address.Address)
+	c.addRobots(c.Current.Address.String())
 	fmt.Fprintf(os.Stderr, "%s\n", "Check robots.txt for: "+c.Current.Address.Host)
 	return crawlStart
 }
@@ -173,7 +173,7 @@ func crawlStart(c *Crawler) crawlfn {
 	// FIXME: put "has max depth" into a method
 	case c.Current.Depth > c.MaxDepth && c.MaxDepth >= 0:
 		return crawlNext
-	case !c.WillCrawl(c.Current.Address.Address) || c.Current.Nofollow:
+	case !c.WillCrawl(c.Current.Address.String()) || c.Current.Nofollow:
 		// If a URL does not match our include and exclude patterns,
 		// or it was pointed to by a nofollow link, there will be
 		// no result for it.
@@ -216,7 +216,7 @@ func crawlFetch(c *Crawler) crawlfn {
 
 	c.result = MakeResult(c.Current.Address, c.Current.Depth)
 
-	resp, err := c.client.Get(c.Current.Address.Address)
+	resp, err := c.client.Get(c.Current.Address.String())
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "Couldn't fetch %s\n", c.Current.Address)
 		return crawlNext
@@ -246,7 +246,7 @@ func crawlMerge(c *Crawler) crawlfn {
 		if link.Address == nil {
 			continue
 		}
-		if c.Seen[link.Address.Address] == false {
+		if c.Seen[link.Address.String()] == false {
 			if !(link.Nofollow && c.RespectNofollow) {
 				node := &Node{
 					Depth: c.Current.Depth + 1,
@@ -254,7 +254,7 @@ func crawlMerge(c *Crawler) crawlfn {
 				}
 				c.Queue = append(c.Queue, node)
 			}
-			c.Seen[link.Address.Address] = true
+			c.Seen[link.Address.String()] = true
 		}
 	}
 	return crawlNext
