@@ -18,6 +18,10 @@ func (a *Address) String() string {
 	return a.Address
 }
 
+func (a *Address) RobotsPath() string {
+	return a.Path + "?" + a.RawQuery
+}
+
 func (a *Address) toURL() *url.URL {
 	u, _ := url.Parse(a.Address) // FIXME: use error
 	return u

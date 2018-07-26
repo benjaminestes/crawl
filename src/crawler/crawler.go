@@ -173,20 +173,16 @@ func crawlStart(c *Crawler) crawlfn {
 	// FIXME: put "has max depth" into a method
 	case c.Current.Depth > c.MaxDepth && c.MaxDepth >= 0:
 		return crawlNext
-	case !c.WillCrawl(c.Current.Address.String()) || c.Current.Nofollow:
-		// If a URL does not match our include and exclude patterns,
-		// or it was pointed to by a nofollow link, there will be
-		// no result for it.
+	case !c.WillCrawl(c.Current.Address.String()):
+		return crawlNext
+	case c.Current.Nofollow:
 		return crawlNext
 	case c.robots[c.Current.Address.Host] == nil:
 		if _, ok := c.robots[c.Current.Address.Host]; !ok {
-			// We haven't read robots.txt for the current domain!
 			return crawlAddRobots
 		}
-		// We previously failed to find a robots file!
 		return crawlFetch
-		// FIXME: Test for robots.txt of domain of current URL
-	case !c.robots[c.Current.Address.Host].TestAgent(c.Current.Address.Path+"?"+c.Current.Address.RawQuery, c.Config.RobotsUserAgent):
+	case !c.robots[c.Current.Address.Host].TestAgent(c.Current.Address.RobotsPath(), c.Config.RobotsUserAgent):
 		return crawlRobotsBlocked
 	case time.Since(c.LastRequestTime) < c.wait:
 		return crawlWait
