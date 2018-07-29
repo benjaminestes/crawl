@@ -85,16 +85,16 @@ func (c *Crawler) preparePatterns(include, exclude []string) {
 	}
 }
 
-func (c *Crawler) WillCrawl(u string) bool { // Should this test addresses?
-	for _, p := range c.include {
-		if p.MatchString(u) {
-			return true
-		}
-	}
-
+func (c *Crawler) WillCrawl(u string) bool {
 	for _, p := range c.exclude {
 		if p.MatchString(u) {
 			return false
+		}
+	}
+
+	for _, p := range c.include {
+		if p.MatchString(u) {
+			return true
 		}
 	}
 
@@ -110,9 +110,7 @@ func (c *Crawler) addRobots(u string) {
 		return
 	}
 
-	// No matter what, make an entry for this host
-	// That way we know we've check at least once
-
+	// Now we've "seen" this host.
 	c.robots[url.Host] = nil
 
 	resp, err := http.Get(url.Scheme + "://" + url.Host + "/robots.txt")
