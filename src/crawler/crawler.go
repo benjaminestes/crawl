@@ -2,6 +2,7 @@ package crawler
 
 import (
 	"fmt"
+	"log"
 	"net/http"
 	"net/url"
 	"os"
@@ -28,18 +29,16 @@ type Node struct {
 }
 
 type Crawler struct {
-	Current         *Node
-	Queue           []*Node
+	connections     chan bool
+	newnodes        chan []*Node
+	n               int
 	Seen            map[string]bool // Full text of address
 	results         chan *Result
-	result          *Result
-	newlist         []*Link
 	robots          map[string]*robotstxt.RobotsData
 	LastRequestTime time.Time
 	wait            time.Duration
 	include         []*regexp.Regexp
 	exclude         []*regexp.Regexp
-	client          *http.Client
 	*Config
 }
 
@@ -57,24 +56,19 @@ func Crawl(config *Config) *Crawler {
 	wait, _ := time.ParseDuration(config.WaitTime)
 
 	c := &Crawler{
-		Current: first, // ←
-		Queue: []*Node{ // Only one of these should need to be set...
-			first,
-		},
-		Seen:    make(map[string]bool),
-		results: make(chan *Result),
-		Config:  config,
-		wait:    wait,
-		client: &http.Client{
-			CheckRedirect: func(req *http.Request, via []*http.Request) error {
-				return http.ErrUseLastResponse
-			},
-		},
-		robots: make(map[string]*robotstxt.RobotsData),
+		connections: make(chan bool, 20),
+		Seen:        make(map[string]bool),
+		results:     make(chan *Result, 20),
+		newnodes:    make(chan []*Node),
+		Config:      config,
+		wait:        wait,
+		robots:      make(map[string]*robotstxt.RobotsData),
 	}
 	c.preparePatterns(config.Include, config.Exclude)
-	c.Seen[first.Address.String()] = true
-	go c.run()
+
+	c.n++
+	go func() { c.newnodes <- []*Node{first} }()
+	go c.work()
 	return c
 }
 
@@ -121,7 +115,7 @@ func (c *Crawler) addRobots(u string) {
 
 	c.robots[url.Host] = nil
 
-	resp, err := c.client.Get(url.Scheme + "://" + url.Host + "/robots.txt")
+	resp, err := http.Get(url.Scheme + "://" + url.Host + "/robots.txt")
 	if err != nil {
 		return
 	}
@@ -129,17 +123,6 @@ func (c *Crawler) addRobots(u string) {
 
 	robots, _ := robotstxt.FromResponse(resp)
 	c.robots[url.Host] = robots
-}
-
-func (c *Crawler) emit() {
-	c.results <- c.result
-}
-
-func (c *Crawler) run() {
-	for state := crawlStart; state != nil; {
-		state = state(c)
-	}
-	close(c.results)
 }
 
 func (c *Crawler) Next() *Result {
@@ -154,104 +137,100 @@ func (c *Crawler) resetWait() {
 	c.LastRequestTime = time.Now()
 }
 
-// State machine functions
-
-func crawlWait(c *Crawler) crawlfn {
-	time.Sleep(10 * time.Millisecond)
-	return crawlFetch
-}
-
-func crawlAddRobots(c *Crawler) crawlfn {
-	// Crawler already has this state — does it need to be passed?
-	c.addRobots(c.Current.Address.String())
-	fmt.Fprintf(os.Stderr, "%s\n", "Check robots.txt for: "+c.Current.Address.Host)
-	return crawlStart
-}
-
-func crawlStart(c *Crawler) crawlfn {
-	switch {
-	// FIXME: put "has max depth" into a method
-	case c.Current.Depth > c.MaxDepth && c.MaxDepth >= 0:
-		return crawlNext
-	case !c.WillCrawl(c.Current.Address.String()):
-		return crawlNext
-	case c.Current.Nofollow:
-		return crawlNext
-	case c.robots[c.Current.Address.Host] == nil:
-		if _, ok := c.robots[c.Current.Address.Host]; !ok {
-			return crawlAddRobots
+func (c *Crawler) work() {
+	for ; c.n > 0; c.n-- {
+		nodes := <-c.newnodes
+		for _, node := range nodes {
+			switch {
+			case node.Depth > c.MaxDepth && c.MaxDepth >= 0:
+				continue
+			case node.Address == nil:
+				continue
+			case !c.WillCrawl(node.Address.String()):
+				continue
+			case c.Seen[node.Address.String()]:
+				continue
+			case node.Nofollow && c.RespectNofollow:
+				continue
+			case c.robots[node.Address.Host] == nil:
+				if _, ok := c.robots[node.Address.Host]; !ok {
+					log.Printf("fetch robots %s\n", node.String())
+					c.addRobots(node.Address.String())
+				}
+			case !c.robots[node.Address.Host].TestAgent(node.Address.RobotsPath(), c.Config.RobotsUserAgent):
+				result := MakeResult(node.Address, node.Depth)
+				result.Status = "Blocked by robots.txt"
+				c.results <- result
+				continue
+			case time.Since(c.LastRequestTime) < c.wait:
+				time.Sleep(c.wait - time.Since(c.LastRequestTime))
+			}
+			c.resetWait()
+			log.Printf("released %s\n", node.String())
+			c.Seen[node.Address.String()] = true
+			c.n++
+			go c.fetch(node)
 		}
-		return crawlFetch
-	case !c.robots[c.Current.Address.Host].TestAgent(c.Current.Address.RobotsPath(), c.Config.RobotsUserAgent):
-		return crawlRobotsBlocked
-	case time.Since(c.LastRequestTime) < c.wait:
-		return crawlWait
-	default:
-		return crawlFetch
 	}
+	close(c.results)
 }
 
-func crawlNext(c *Crawler) crawlfn {
-	c.Queue = c.Queue[1:]
-	if len(c.Queue) == 0 {
-		return nil
+func (c *Crawler) fetch(node *Node) {
+	c.connections <- true
+	defer func() { <-c.connections }()
+
+	client := &http.Client{
+		CheckRedirect: func(req *http.Request, via []*http.Request) error {
+			return http.ErrUseLastResponse
+		},
 	}
-	c.Current = c.Queue[0] // Still not sure how much this helps
-	return crawlStart
-}
 
-func crawlRobotsBlocked(c *Crawler) crawlfn {
-	c.result = MakeResult(c.Current.Address, c.Current.Depth)
-	c.result.Status = "Blocked by robots.txt"
-	c.emit()
-	return crawlNext
-}
+	log.Printf("fetched %s\n", node.String())
+	result := MakeResult(node.Address, node.Depth)
 
-func crawlFetch(c *Crawler) crawlfn {
-	c.resetWait()
-
-	c.result = MakeResult(c.Current.Address, c.Current.Depth)
-
-	resp, err := c.client.Get(c.Current.Address.String())
+	resp, err := client.Get(node.Address.String())
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "Couldn't fetch %s\n", c.Current.Address)
-		return crawlNext
+		go func() { c.newnodes <- []*Node{} }()
+		fmt.Fprintf(os.Stderr, "Couldn't fetch %s\n", node.Address)
+		return
 	}
 	defer resp.Body.Close()
 
 	tree, err := html.Parse(resp.Body)
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "Couldn't parse %s\n", c.Current.Address)
-		return crawlNext
+		go func() { c.newnodes <- []*Node{} }()
+		fmt.Fprintf(os.Stderr, "Couldn't parse %s\n", node.Address)
+		return
 	}
 
-	c.result.Hydrate(resp, tree)
-	c.newlist = c.result.Links
+	result.Hydrate(resp, tree)
+	links := result.Links
 
 	// If redirect, add target to list
 	if resp.StatusCode >= 300 && resp.StatusCode < 400 {
-		c.newlist = []*Link{MakeLink(c.Current.Address, resp.Header.Get("Location"), "", false)}
+		links = []*Link{
+			MakeLink(
+				node.Address,
+				resp.Header.Get("Location"),
+				"",
+				false,
+			),
+		}
 	}
-
-	c.emit()
-	return crawlMerge
+	go func() {
+		c.newnodes <- linksToNodes(node.Depth+1, links)
+		log.Printf("added list len %d\n", len(links))
+	}()
+	log.Printf("sent result %s\n", node.String())
+	c.results <- result
 }
 
-func crawlMerge(c *Crawler) crawlfn {
-	for _, link := range c.newlist {
-		if link.Address == nil {
-			continue
-		}
-		if c.Seen[link.Address.String()] == false {
-			if !(link.Nofollow && c.RespectNofollow) {
-				node := &Node{
-					Depth: c.Current.Depth + 1,
-					Link:  link,
-				}
-				c.Queue = append(c.Queue, node)
-			}
-			c.Seen[link.Address.String()] = true
-		}
+func linksToNodes(depth int, links []*Link) (nodes []*Node) {
+	for _, link := range links {
+		nodes = append(nodes, &Node{
+			Depth: depth,
+			Link:  link,
+		})
 	}
-	return crawlNext
+	return
 }

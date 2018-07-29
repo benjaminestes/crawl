@@ -6,8 +6,8 @@ import (
 	"io/ioutil"
 	"log"
 	"os"
-	"strings"
-	"time"
+	// "strings"
+	// "time"
 
 	"github.com/benjaminestes/crawl/src/crawler"
 )
@@ -33,20 +33,18 @@ func main() {
 	c := crawler.Crawl(config)
 
 	count := 0
-	start := time.Now()
+	//start := time.Now()
 	for n := c.Next(); n != nil; n = c.Next() {
 		j, _ := json.Marshal(n)
 		fmt.Printf("%s\n", j)
 		count++
-		fmt.Fprintf(os.Stderr, "\r%s", strings.Repeat(" ", 65))
-		fmt.Fprintf(
-			os.Stderr,
-			"\r%s : %d crawled : %d queued : %d seen",
-			time.Since(start).Round(time.Second),
-			count,
-			len(c.Queue),
-			len(c.Seen),
-		)
+		// fmt.Fprintf(os.Stderr, "\r%s", strings.Repeat(" ", 65))
+		// fmt.Fprintf(
+		// os.Stderr,
+		// "\r%s : %d crawled",
+		// time.Since(start).Round(time.Second),
+		// count,
+		// )
 	}
 
 	fmt.Fprintf(os.Stderr, "\n")
