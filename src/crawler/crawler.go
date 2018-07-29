@@ -6,6 +6,7 @@ import (
 	"net/url"
 	"os"
 	"regexp"
+	"sync"
 	"time"
 
 	"github.com/temoto/robotstxt"
@@ -30,6 +31,7 @@ type Node struct {
 type Crawler struct {
 	connections     chan bool
 	newnodes        chan []*Node
+	queue           []*Node
 	n               int
 	Seen            map[string]bool // Full text of address
 	results         chan *Result
@@ -59,15 +61,20 @@ func Crawl(config *Config) *Crawler {
 		Seen:        make(map[string]bool),
 		results:     make(chan *Result, 20),
 		newnodes:    make(chan []*Node),
+		queue:       []*Node{first},
 		Config:      config,
 		wait:        wait,
 		robots:      make(map[string]*robotstxt.RobotsData),
 	}
 	c.preparePatterns(config.Include, config.Exclude)
 
-	c.n++
-	go func() { c.newnodes <- []*Node{first} }()
-	go c.work()
+	go func() {
+		for len(c.queue) > 0 {
+			c.work()
+		}
+		close(c.results)
+	}()
+
 	return c
 }
 
@@ -135,39 +142,61 @@ func (c *Crawler) resetWait() {
 }
 
 func (c *Crawler) work() {
-	for ; c.n > 0; c.n-- {
-		nodes := <-c.newnodes
-		for _, node := range nodes {
-			switch {
-			case node.Depth > c.MaxDepth && c.MaxDepth >= 0:
-				continue
-			case node.Address == nil:
-				continue
-			case !c.WillCrawl(node.Address.String()):
-				continue
-			case c.Seen[node.Address.String()]:
-				continue
-			case node.Nofollow && c.RespectNofollow:
-				continue
-			case c.robots[node.Address.Host] == nil:
-				if _, ok := c.robots[node.Address.Host]; !ok {
-					c.addRobots(node.Address.String())
-				}
-			case !c.robots[node.Address.Host].TestAgent(node.Address.RobotsPath(), c.Config.RobotsUserAgent):
+	var awaiting int
+	var wg sync.WaitGroup
+	for _, node := range c.queue {
+		switch {
+		case node.Depth > c.MaxDepth && c.MaxDepth >= 0:
+			continue
+		case !c.WillCrawl(node.Address.String()):
+			continue
+		case c.robots[node.Address.Host] == nil:
+			if _, ok := c.robots[node.Address.Host]; !ok {
+				c.addRobots(node.Address.String())
+			}
+			if !c.robots[node.Address.Host].TestAgent(node.Address.RobotsPath(), c.Config.RobotsUserAgent) {
 				result := MakeResult(node.Address, node.Depth)
 				result.Status = "Blocked by robots.txt"
 				c.results <- result
 				continue
-			case time.Since(c.LastRequestTime) < c.wait:
-				time.Sleep(c.wait - time.Since(c.LastRequestTime))
 			}
-			c.resetWait()
-			c.Seen[node.Address.String()] = true
-			c.n++
-			go c.fetch(node)
+		case !c.robots[node.Address.Host].TestAgent(node.Address.RobotsPath(), c.Config.RobotsUserAgent):
+			result := MakeResult(node.Address, node.Depth)
+			result.Status = "Blocked by robots.txt"
+			c.results <- result
+			continue
+		case time.Since(c.LastRequestTime) < c.wait:
+			time.Sleep(c.wait - time.Since(c.LastRequestTime))
+		}
+		c.resetWait()
+		wg.Add(1)
+		awaiting++
+		n := node // Ensure binding doesn't get used by multiple gofuns
+		go func() {
+			defer wg.Done()
+			c.fetch(n)
+		}()
+	}
+	wg.Wait()
+	c.merge(awaiting)
+}
+
+func (c *Crawler) merge(n int) {
+	c.queue = nil
+	for ; n > 0; n-- {
+		nodes := <-c.newnodes
+		for _, node := range nodes {
+			if node.Address == nil {
+				continue
+			}
+			if _, ok := c.Seen[node.Address.String()]; !ok {
+				if !(node.Nofollow && c.RespectNofollow) {
+					c.Seen[node.Address.String()] = true
+					c.queue = append(c.queue, node)
+				}
+			}
 		}
 	}
-	close(c.results)
 }
 
 func (c *Crawler) fetch(node *Node) {
