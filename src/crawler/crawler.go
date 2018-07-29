@@ -1,10 +1,8 @@
 package crawler
 
 import (
-	"fmt"
 	"net/http"
 	"net/url"
-	"os"
 	"regexp"
 	"sync"
 	"time"
@@ -32,7 +30,9 @@ type Crawler struct {
 	connections     chan bool
 	newnodes        chan []*Node
 	queue           []*Node
+	nextqueue       []*Node
 	n               int
+	mu              sync.Mutex      // guards nextqueue
 	Seen            map[string]bool // Full text of address
 	results         chan *Result
 	robots          map[string]*robotstxt.RobotsData
@@ -71,6 +71,8 @@ func Crawl(config *Config) *Crawler {
 	go func() {
 		for len(c.queue) > 0 {
 			c.work()
+			c.queue = c.nextqueue
+			c.nextqueue = nil
 		}
 		close(c.results)
 	}()
@@ -142,8 +144,7 @@ func (c *Crawler) resetWait() {
 }
 
 func (c *Crawler) work() {
-	var awaiting int
-	var wg sync.WaitGroup
+	var wg, wg2 sync.WaitGroup
 	for _, node := range c.queue {
 		switch {
 		case node.Depth > c.MaxDepth && c.MaxDepth >= 0:
@@ -169,33 +170,36 @@ func (c *Crawler) work() {
 			time.Sleep(c.wait - time.Since(c.LastRequestTime))
 		}
 		c.resetWait()
-		wg.Add(1)
-		awaiting++
 		n := node // Ensure binding doesn't get used by multiple gofuns
+		wg.Add(1)
 		go func() {
 			defer wg.Done()
 			c.fetch(n)
 		}()
+		wg2.Add(1)
+		go func() {
+			defer wg2.Done()
+			c.merge()
+		}()
 	}
 	wg.Wait()
-	c.merge(awaiting)
+	wg2.Wait()
 }
 
-func (c *Crawler) merge(n int) {
-	c.queue = nil
-	for ; n > 0; n-- {
-		nodes := <-c.newnodes
-		for _, node := range nodes {
-			if node.Address == nil {
-				continue
-			}
-			if _, ok := c.Seen[node.Address.String()]; !ok {
-				if !(node.Nofollow && c.RespectNofollow) {
-					c.Seen[node.Address.String()] = true
-					c.queue = append(c.queue, node)
-				}
+func (c *Crawler) merge() {
+	nodes := <-c.newnodes
+	for _, node := range nodes {
+		if node.Address == nil {
+			continue
+		}
+		c.mu.Lock()
+		if _, ok := c.Seen[node.Address.String()]; !ok {
+			if !(node.Nofollow && c.RespectNofollow) {
+				c.Seen[node.Address.String()] = true
+				c.nextqueue = append(c.nextqueue, node)
 			}
 		}
+		c.mu.Unlock()
 	}
 }
 
@@ -214,7 +218,7 @@ func (c *Crawler) fetch(node *Node) {
 	resp, err := client.Get(node.Address.String())
 	if err != nil {
 		go func() { c.newnodes <- []*Node{} }()
-		fmt.Fprintf(os.Stderr, "Couldn't fetch %s\n", node.Address)
+		// TODO: Couldn't fetch
 		return
 	}
 	defer resp.Body.Close()
@@ -222,7 +226,7 @@ func (c *Crawler) fetch(node *Node) {
 	tree, err := html.Parse(resp.Body)
 	if err != nil {
 		go func() { c.newnodes <- []*Node{} }()
-		fmt.Fprintf(os.Stderr, "Couldn't parse %s\n", node.Address)
+		// TODO: Couldn't parse
 		return
 	}
 
