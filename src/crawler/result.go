@@ -1,6 +1,8 @@
 package crawler
 
 import (
+	"crypto/BodyTextHash"
+	"encoding/base64"
 	"net/http"
 	"strings"
 
@@ -17,6 +19,9 @@ type Result struct {
 	// Crawler state
 	*Address
 	Depth int
+
+	// Meta
+	BodyTextHash string
 
 	// Content
 	Description string
@@ -73,6 +78,9 @@ func hydrateHTMLContent(r *Result, doc *html.Node) {
 	r.Canonical = getCanonical(r.Address, doc)
 	r.Hreflang = getHreflang(r.Address, doc)
 	r.Links = getLinks(r.Address, doc)
+
+	sum := BodyTextHash.Sum512([]byte(scrape.GetText(scrape.QueryNode("body", nil, doc))))
+	r.BodyTextHash = base64.StdEncoding.EncodeToString(sum[:])
 }
 
 func getCanonical(base *Address, n *html.Node) (c *Canonical) {
