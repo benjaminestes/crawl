@@ -2,7 +2,6 @@ package crawler
 
 import (
 	"fmt"
-	"log"
 	"net/http"
 	"net/url"
 	"os"
@@ -152,7 +151,6 @@ func (c *Crawler) work() {
 				continue
 			case c.robots[node.Address.Host] == nil:
 				if _, ok := c.robots[node.Address.Host]; !ok {
-					log.Printf("fetch robots %s\n", node.String())
 					c.addRobots(node.Address.String())
 				}
 			case !c.robots[node.Address.Host].TestAgent(node.Address.RobotsPath(), c.Config.RobotsUserAgent):
@@ -164,7 +162,6 @@ func (c *Crawler) work() {
 				time.Sleep(c.wait - time.Since(c.LastRequestTime))
 			}
 			c.resetWait()
-			log.Printf("released %s\n", node.String())
 			c.Seen[node.Address.String()] = true
 			c.n++
 			go c.fetch(node)
@@ -183,7 +180,6 @@ func (c *Crawler) fetch(node *Node) {
 		},
 	}
 
-	log.Printf("fetched %s\n", node.String())
 	result := MakeResult(node.Address, node.Depth)
 
 	resp, err := client.Get(node.Address.String())
@@ -217,9 +213,7 @@ func (c *Crawler) fetch(node *Node) {
 	}
 	go func() {
 		c.newnodes <- linksToNodes(node.Depth+1, links)
-		log.Printf("added list len %d\n", len(links))
 	}()
-	log.Printf("sent result %s\n", node.String())
 	c.results <- result
 }
 

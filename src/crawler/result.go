@@ -1,7 +1,7 @@
 package crawler
 
 import (
-	"crypto/BodyTextHash"
+	"crypto/sha512"
 	"encoding/base64"
 	"net/http"
 	"strings"
@@ -79,7 +79,7 @@ func hydrateHTMLContent(r *Result, doc *html.Node) {
 	r.Hreflang = getHreflang(r.Address, doc)
 	r.Links = getLinks(r.Address, doc)
 
-	sum := BodyTextHash.Sum512([]byte(scrape.GetText(scrape.QueryNode("body", nil, doc))))
+	sum := sha512.Sum512([]byte(scrape.GetText(scrape.QueryNode("body", nil, doc))))
 	r.BodyTextHash = base64.StdEncoding.EncodeToString(sum[:])
 }
 
