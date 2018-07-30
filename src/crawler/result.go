@@ -48,9 +48,13 @@ func MakeResult(addr *Address, depth int) *Result {
 	}
 }
 
-func (r *Result) Hydrate(resp *http.Response, doc *html.Node) {
+func (r *Result) Hydrate(resp *http.Response) {
 	hydrateHeader(r, resp)
 	if strings.HasPrefix(resp.Header.Get("Content-Type"), "text/html") {
+		doc, err := html.Parse(resp.Body)
+		if err != nil {
+			return
+		}
 		hydrateHTMLContent(r, doc)
 	}
 }

@@ -8,7 +8,6 @@ import (
 	"time"
 
 	"github.com/temoto/robotstxt"
-	"golang.org/x/net/html"
 )
 
 type Config struct {
@@ -67,6 +66,7 @@ func Crawl(config *Config) *Crawler {
 		robots:      make(map[string]*robotstxt.RobotsData),
 	}
 	c.preparePatterns(config.Include, config.Exclude)
+	c.Seen[first.Address.String()] = true
 
 	go func() {
 		for len(c.queue) > 0 {
@@ -223,14 +223,7 @@ func (c *Crawler) fetch(node *Node) {
 	}
 	defer resp.Body.Close()
 
-	tree, err := html.Parse(resp.Body)
-	if err != nil {
-		go func() { c.newnodes <- []*Node{} }()
-		// TODO: Couldn't parse
-		return
-	}
-
-	result.Hydrate(resp, tree)
+	result.Hydrate(resp)
 	links := result.Links
 
 	// If redirect, add target to list
