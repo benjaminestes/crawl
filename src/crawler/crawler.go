@@ -225,9 +225,11 @@ func (c *Crawler) fetch(node *Node) {
 
 	result.Hydrate(resp)
 	links := result.Links
+	result.ResolvesTo = result.Address
 
 	// If redirect, add target to list
 	if resp.StatusCode >= 300 && resp.StatusCode < 400 {
+		result.ResolvesTo = MakeAddressFromRelative(node.Address, resp.Header.Get("Location"))
 		links = []*Link{
 			MakeLink(
 				node.Address,

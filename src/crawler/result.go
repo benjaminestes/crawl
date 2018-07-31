@@ -39,6 +39,7 @@ type Result struct {
 	ProtoMajor int
 	ProtoMinor int
 	Header     []*Pair
+	ResolvesTo *Address // In case of redirect
 }
 
 func MakeResult(addr *Address, depth int) *Result {
