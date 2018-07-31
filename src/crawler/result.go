@@ -119,7 +119,7 @@ func getLinks(base *Address, n *html.Node) (links []*Link) {
 			base,
 			href,
 			scrape.GetText(a),
-			scrape.GetAttribute("rel", n) == "nofollow", // FIXME: Trim whitespace?
+			scrape.GetAttribute("rel", a) == "nofollow", // FIXME: Trim whitespace?
 		)
 		links = append(links, link)
 	}
