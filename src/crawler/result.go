@@ -11,8 +11,8 @@ import (
 )
 
 type Pair struct {
-	Key string
-	Val string
+	K string
+	V string
 }
 
 type Result struct {
