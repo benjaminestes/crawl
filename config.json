@@ -1,0 +1,15 @@
+{
+    "Start": "https://www.distilled.net/",
+    "Include": [
+        "^(https?://)?www\\.distilled\\.net/.*"
+    ],
+    "Exclude": [ ],
+
+    "MaxDepth": 3,
+
+    "UserAgent": "Crawler/1",
+    "RobotsUserAgent": "Crawler",
+    "RespectNofollow": true,
+
+    "Header": []
+}
