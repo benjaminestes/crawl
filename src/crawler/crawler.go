@@ -30,8 +30,8 @@ type Crawler struct {
 	newnodes        chan []*Node
 	queue           []*Node
 	nextqueue       []*Node
-	n               int
-	mu              sync.Mutex      // guards nextqueue
+	mu              *sync.Mutex     // guards nextqueue
+	wg              *sync.WaitGroup // watches for merging new links
 	Seen            map[string]bool // Full text of address
 	results         chan *Result
 	robots          map[string]*robotstxt.RobotsData
@@ -64,15 +64,15 @@ func Crawl(config *Config) *Crawler {
 		Config:      config,
 		wait:        wait,
 		robots:      make(map[string]*robotstxt.RobotsData),
+		mu:          new(sync.Mutex),
+		wg:          new(sync.WaitGroup),
 	}
 	c.preparePatterns(config.Include, config.Exclude)
 	c.Seen[first.Address.String()] = true
 
 	go func() {
-		for len(c.queue) > 0 {
-			c.work()
-			c.queue = c.nextqueue
-			c.nextqueue = nil
+		for f := crawlStartQueue; f != nil; {
+			f = f(c)
 		}
 		close(c.results)
 	}()
@@ -143,47 +143,77 @@ func (c *Crawler) resetWait() {
 	c.LastRequestTime = time.Now()
 }
 
-func (c *Crawler) work() {
-	var wg, wg2 sync.WaitGroup
-	for _, node := range c.queue {
-		switch {
-		case node.Depth > c.MaxDepth && c.MaxDepth >= 0:
-			continue
-		case !c.WillCrawl(node.Address.String()):
-			continue
-		case c.robots[node.Address.Host] == nil:
-			if _, ok := c.robots[node.Address.Host]; !ok {
-				c.addRobots(node.Address.String())
-			}
-			if !c.robots[node.Address.Host].TestAgent(node.Address.RobotsPath(), c.Config.RobotsUserAgent) {
-				result := MakeResult(node.Address, node.Depth)
-				result.Status = "Blocked by robots.txt"
-				c.results <- result
-				continue
-			}
-		case !c.robots[node.Address.Host].TestAgent(node.Address.RobotsPath(), c.Config.RobotsUserAgent):
-			result := MakeResult(node.Address, node.Depth)
-			result.Status = "Blocked by robots.txt"
-			c.results <- result
-			continue
-		case time.Since(c.LastRequestTime) < c.wait:
-			time.Sleep(c.wait - time.Since(c.LastRequestTime))
-		}
-		c.resetWait()
-		n := node // Ensure binding doesn't get used by multiple gofuns
-		wg.Add(1)
-		go func() {
-			defer wg.Done()
-			c.fetch(n)
-		}()
-		wg2.Add(1)
-		go func() {
-			defer wg2.Done()
-			c.merge()
-		}()
+func crawlStartQueue(c *Crawler) crawlfn {
+	if len(c.queue) > 0 {
+		return crawlStart
 	}
-	wg.Wait()
-	wg2.Wait()
+	return nil
+}
+
+func crawlNextQueue(c *Crawler) crawlfn {
+	c.queue = c.nextqueue
+	c.nextqueue = nil
+	return crawlStartQueue
+}
+
+func crawlStart(c *Crawler) crawlfn {
+	node := c.queue[0] // If this panics, there is a logic error.
+	switch {
+	case time.Since(c.LastRequestTime) < c.wait:
+		return crawlWait
+	case node.Depth > c.MaxDepth && c.MaxDepth >= 0:
+		return crawlNext
+	case !c.WillCrawl(node.Address.String()):
+		return crawlNext
+	default:
+		return crawlDo
+	}
+}
+
+func crawlCheckRobots(c *Crawler) crawlfn {
+	node := c.queue[0]
+	if _, ok := c.robots[node.Address.Host]; !ok {
+		c.addRobots(node.Address.String())
+	}
+	if !c.robots[node.Address.Host].TestAgent(node.Address.RobotsPath(), c.Config.RobotsUserAgent) {
+		result := MakeResult(node.Address, node.Depth)
+		result.Status = "Blocked by robots.txt"
+		c.results <- result
+	}
+	return crawlDo
+}
+
+func crawlWait(c *Crawler) crawlfn {
+	time.Sleep(c.wait - time.Since(c.LastRequestTime))
+	return crawlStart
+}
+
+func crawlNext(c *Crawler) crawlfn {
+	c.queue = c.queue[1:]
+	if len(c.queue) > 0 {
+		return crawlStart
+	}
+	return crawlAwait
+}
+
+func crawlDo(c *Crawler) crawlfn {
+	c.resetWait()
+	node := c.queue[0]
+
+	go c.fetch(node)
+
+	c.wg.Add(1)
+	go func() {
+		defer c.wg.Done()
+		c.merge()
+	}()
+
+	return crawlNext
+}
+
+func crawlAwait(c *Crawler) crawlfn {
+	c.wg.Wait()
+	return crawlNextQueue
 }
 
 func (c *Crawler) merge() {
