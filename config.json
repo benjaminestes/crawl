@@ -7,6 +7,9 @@
 
     "MaxDepth": 3,
 
+    "WaitTime": "100ms",
+    "Connections": 20,
+
     "UserAgent": "Crawler/1",
     "RobotsUserAgent": "Crawler",
     "RespectNofollow": true,
