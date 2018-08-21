@@ -11,6 +11,7 @@ import (
 )
 
 type Config struct {
+	Connections     int
 	RobotsUserAgent string
 	Include         []string
 	Exclude         []string
@@ -56,7 +57,7 @@ func Crawl(config *Config) *Crawler {
 	wait, _ := time.ParseDuration(config.WaitTime)
 
 	c := &Crawler{
-		connections: make(chan bool, 20),
+		connections: make(chan bool, config.Connections),
 		Seen:        make(map[string]bool),
 		results:     make(chan *Result, 20),
 		newnodes:    make(chan []*Node),
