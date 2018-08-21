@@ -1,7 +1,7 @@
 {
-    "Start": "https://www.distilled.net/",
+    "Start": "http://www.example.com/",
     "Include": [
-        "^(https?://)?www\\.distilled\\.net/.*"
+        "^(https?://)?www\\.example\\.com/.*"
     ],
     "Exclude": [ ],
 
