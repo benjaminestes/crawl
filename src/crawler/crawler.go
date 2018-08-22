@@ -26,6 +26,14 @@ type Node struct {
 	*Link
 }
 
+func MakeNode(d int, s string) *Node {
+	// Should this anticipate a failure condition?
+	return &Node{
+		Depth: d,
+		Link:  MakeAbsoluteLink(s, "", false),
+	}
+}
+
 type Crawler struct {
 	connections     chan bool
 	newnodes        chan []*Node
@@ -47,11 +55,11 @@ type crawlfn func(*Crawler) crawlfn
 
 func Crawl(config *Config) *Crawler {
 	// This should anticipate a failure condition
-	first := &Node{
-		Depth: 0,
-		Link:  MakeAbsoluteLink(config.Start, "", false),
-	}
+	first := MakeNode(0, config.Start)
+	return CrawlList(config, []*Node{first})
+}
 
+func CrawlList(config *Config, q []*Node) *Crawler {
 	// FIXME: Should be configurable
 	// also probably handle error
 	wait, _ := time.ParseDuration(config.WaitTime)
@@ -61,7 +69,7 @@ func Crawl(config *Config) *Crawler {
 		Seen:        make(map[string]bool),
 		results:     make(chan *Result, 20),
 		newnodes:    make(chan []*Node),
-		queue:       []*Node{first},
+		queue:       q,
 		Config:      config,
 		wait:        wait,
 		robots:      make(map[string]*robotstxt.RobotsData),
@@ -69,7 +77,10 @@ func Crawl(config *Config) *Crawler {
 		wg:          new(sync.WaitGroup),
 	}
 	c.preparePatterns(config.Include, config.Exclude)
-	c.Seen[first.Address.String()] = true
+
+	for _, v := range c.queue {
+		c.Seen[v.Address.String()] = true
+	}
 
 	go func() {
 		for f := crawlStartQueue; f != nil; {
