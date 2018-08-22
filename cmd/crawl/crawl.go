@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bufio"
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
@@ -19,7 +20,12 @@ var config = &crawler.Config{
 }
 
 func main() {
-	configJSON, err := ioutil.ReadFile("config.json")
+	if len(os.Args) != 3 {
+		fmt.Fprintln(os.Stderr, "Expected command and config file path.")
+		os.Exit(1)
+	}
+
+	configJSON, err := ioutil.ReadFile(os.Args[2])
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -30,7 +36,17 @@ func main() {
 		os.Exit(0)
 	}
 
-	c := crawler.Crawl(config)
+	var c *crawler.Crawler
+
+	switch os.Args[1] {
+	case "site":
+		c = crawlSite(config)
+	case "list":
+		c = crawlList(config)
+	default:
+		fmt.Fprintln(os.Stderr, "Invalid command.")
+		os.Exit(1)
+	}
 
 	count := 0
 	start := time.Now()
@@ -48,4 +64,19 @@ func main() {
 	}
 
 	fmt.Fprintf(os.Stderr, "\n")
+}
+
+func crawlSite(config *crawler.Config) *crawler.Crawler {
+	return crawler.Crawl(config)
+}
+
+func crawlList(config *crawler.Config) *crawler.Crawler {
+	var queue []*crawler.Node
+	scanner := bufio.NewScanner(os.Stdin)
+	for scanner.Scan() {
+		n := crawler.MakeNode(0, scanner.Text())
+		queue = append(queue, n)
+	}
+	config.MaxDepth = 0
+	return crawler.CrawlList(config, queue)
 }
