@@ -39,8 +39,8 @@ type Crawler struct {
 	newnodes        chan []*Node
 	queue           []*Node
 	nextqueue       []*Node
-	mu              *sync.Mutex     // guards nextqueue
-	wg              *sync.WaitGroup // watches for merging new links
+	mu              sync.Mutex      // guards nextqueue
+	wg              sync.WaitGroup  // watches for merging new links
 	Seen            map[string]bool // Full text of address
 	results         chan *Result
 	robots          map[string]*robotstxt.RobotsData
@@ -48,6 +48,7 @@ type Crawler struct {
 	wait            time.Duration
 	include         []*regexp.Regexp
 	exclude         []*regexp.Regexp
+	client          *http.Client
 	*Config
 }
 
@@ -64,6 +65,18 @@ func CrawlList(config *Config, q []*Node) *Crawler {
 	// also probably handle error
 	wait, _ := time.ParseDuration(config.WaitTime)
 
+	tr := &http.Transport{
+		MaxIdleConns:    config.Connections,
+		IdleConnTimeout: 30 * time.Second,
+	}
+
+	client := &http.Client{
+		CheckRedirect: func(req *http.Request, via []*http.Request) error {
+			return http.ErrUseLastResponse
+		},
+		Transport: tr,
+	}
+
 	c := &Crawler{
 		connections: make(chan bool, config.Connections),
 		Seen:        make(map[string]bool),
@@ -71,10 +84,9 @@ func CrawlList(config *Config, q []*Node) *Crawler {
 		newnodes:    make(chan []*Node),
 		queue:       q,
 		Config:      config,
+		client:      client,
 		wait:        wait,
 		robots:      make(map[string]*robotstxt.RobotsData),
-		mu:          new(sync.Mutex),
-		wg:          new(sync.WaitGroup),
 	}
 	c.preparePatterns(config.Include, config.Exclude)
 
@@ -209,11 +221,18 @@ func crawlNext(c *Crawler) crawlfn {
 }
 
 func crawlDo(c *Crawler) crawlfn {
-	c.resetWait()
 	node := c.queue[0]
 
-	go c.fetch(node)
+	// This allows me to spawn no more than 20 fetches
+	c.connections <- true
+	c.resetWait()
+	go func() {
+		defer func() { <-c.connections }()
+		c.fetch(node) // FIXME: implement actual queue?
+	}()
 
+	// This spawns a merge for each fetch — there could be > than 20
+	// active in principle
 	c.wg.Add(1)
 	go func() {
 		defer c.wg.Done()
@@ -231,7 +250,7 @@ func crawlAwait(c *Crawler) crawlfn {
 func (c *Crawler) merge() {
 	nodes := <-c.newnodes
 	for _, node := range nodes {
-		if node.Address == nil {
+		if node.Address == nil || !c.WillCrawl(node.Address.String()) {
 			continue
 		}
 		c.mu.Lock()
@@ -246,18 +265,9 @@ func (c *Crawler) merge() {
 }
 
 func (c *Crawler) fetch(node *Node) {
-	c.connections <- true
-	defer func() { <-c.connections }()
-
-	client := &http.Client{
-		CheckRedirect: func(req *http.Request, via []*http.Request) error {
-			return http.ErrUseLastResponse
-		},
-	}
-
 	result := MakeResult(node.Address, node.Depth)
 
-	resp, err := client.Get(node.Address.String())
+	resp, err := c.client.Get(node.Address.String())
 	if err != nil {
 		go func() { c.newnodes <- []*Node{} }()
 		// TODO: Couldn't fetch

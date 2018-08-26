@@ -3,13 +3,12 @@ package crawler
 import "net/url"
 
 type Address struct {
-	Address  string
-	Scheme   string
-	Opaque   string
-	Host     string
-	Path     string
-	RawPath  string
-	RawQuery string
+	Address string
+	Scheme  string
+	Opaque  string
+	Host    string
+	Path    string
+	Query   string
 }
 
 // Methods
@@ -19,7 +18,7 @@ func (a *Address) String() string {
 }
 
 func (a *Address) RobotsPath() string {
-	return a.Path + "?" + a.RawQuery
+	return a.Path + "?" + a.Query
 }
 
 func (a *Address) toURL() *url.URL {
@@ -43,13 +42,12 @@ func MakeAddressFromURL(u *url.URL) *Address {
 	}
 	u.Fragment = ""
 	return &Address{
-		Address:  u.String(),
-		Scheme:   u.Scheme,
-		Opaque:   u.Opaque,
-		Host:     u.Host,
-		Path:     u.Path,
-		RawPath:  u.RawPath,
-		RawQuery: u.RawQuery,
+		Address: u.String(),
+		Scheme:  u.Scheme,
+		Opaque:  u.Opaque,
+		Host:    u.Host,
+		Path:    u.EscapedPath(),
+		Query:   u.RawQuery,
 	}
 }
 

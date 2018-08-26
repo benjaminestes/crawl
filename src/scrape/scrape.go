@@ -13,6 +13,7 @@ func QueryNodes(name string, attrs map[string]string, n *html.Node) (list []*htm
 	return
 }
 
+// FIXME: inefficient
 func QueryNode(name string, attrs map[string]string, n *html.Node) *html.Node {
 	list := QueryNodes(name, attrs, n)
 	if list == nil {
@@ -132,24 +133,22 @@ func GetClasses(node *html.Node) []string {
 	return strings.Fields(GetAttribute("class", node))
 }
 
-func getTextChildren(node *html.Node) (list []*html.Node) {
-	if node == nil {
-		return nil
-	}
-	if node.Type == html.TextNode {
-		list = append(list, node)
-	}
-	for next := node.FirstChild; next != nil; next = next.NextSibling {
-		list = append(list, getTextChildren(next)...)
-	}
-	return
-}
-
+// does this work?
 func GetText(n *html.Node) string {
-	texts := getTextChildren(n)
-	var strs []string
-	for _, s := range texts {
-		strs = append(strs, s.Data)
+	var b strings.Builder
+	var getTextHelp func(node *html.Node)
+	getTextHelp = func(node *html.Node) {
+		switch {
+		case node == nil:
+			// do nothing
+		case node.Type == html.TextNode:
+			b.WriteString(node.Data)
+		default:
+			for next := node.FirstChild; next != nil; next = next.NextSibling {
+				getTextHelp(next)
+			}
+		}
 	}
-	return strings.Join(strs, "")
+	getTextHelp(n)
+	return b.String()
 }

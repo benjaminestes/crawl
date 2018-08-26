@@ -1,8 +1,10 @@
 package crawler
 
 import (
+	// "bytes"
 	"crypto/sha512"
 	"encoding/base64"
+	// "io/ioutil"
 	"net/http"
 	"strings"
 
@@ -51,6 +53,7 @@ func MakeResult(addr *Address, depth int) *Result {
 
 func (r *Result) Hydrate(resp *http.Response) {
 	hydrateHeader(r, resp)
+
 	if strings.HasPrefix(resp.Header.Get("Content-Type"), "text/html") {
 		doc, err := html.Parse(resp.Body)
 		if err != nil {
