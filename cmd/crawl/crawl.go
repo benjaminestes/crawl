@@ -21,7 +21,7 @@ var config = &crawler.Config{
 
 func main() {
 	if len(os.Args) != 3 {
-		fmt.Fprintln(os.Stderr, "Expected command and config file path.")
+		fmt.Fprintln(os.Stderr, "expected command and config file path")
 		os.Exit(1)
 	}
 
@@ -32,7 +32,7 @@ func main() {
 
 	err = json.Unmarshal(configJSON, config)
 	if err != nil {
-		fmt.Println("config error")
+		fmt.Fprintf(os.Stderr, "couldn't parse json from config file")
 		os.Exit(0)
 	}
 

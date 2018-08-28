@@ -146,12 +146,15 @@ func (c *Crawler) addRobots(u string) {
 	c.robots[url.Host] = nil
 
 	resp, err := http.Get(url.Scheme + "://" + url.Host + "/robots.txt")
-	if err != nil {
+	if err != nil || resp.StatusCode != 200 {
 		return
 	}
 	defer resp.Body.Close()
 
-	robots, _ := robotstxt.FromResponse(resp)
+	robots, err := robotstxt.FromResponse(resp)
+	if err != nil {
+		return
+	}
 	c.robots[url.Host] = robots
 }
 
