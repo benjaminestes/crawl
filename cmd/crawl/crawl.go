@@ -78,10 +78,10 @@ func crawlSite(config *crawler.Config) *crawler.Crawler {
 }
 
 func crawlList(config *crawler.Config) *crawler.Crawler {
-	var queue []*crawler.Node
+	var queue []*crawler.Link
 	scanner := bufio.NewScanner(os.Stdin)
 	for scanner.Scan() {
-		n := crawler.MakeNode(0, scanner.Text())
+		n := crawler.MakeAbsoluteLink(scanner.Text(), "", false)
 		queue = append(queue, n)
 	}
 	config.MaxDepth = 0

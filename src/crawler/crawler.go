@@ -21,24 +21,12 @@ type Config struct {
 	WaitTime        string
 }
 
-type Node struct {
-	Depth int
-	*Link
-}
-
-func MakeNode(d int, s string) *Node {
-	// Should this anticipate a failure condition?
-	return &Node{
-		Depth: d,
-		Link:  MakeAbsoluteLink(s, "", false),
-	}
-}
-
 type Crawler struct {
+	depth           int
 	connections     chan bool
-	newnodes        chan []*Node
-	queue           []*Node
-	nextqueue       []*Node
+	newnodes        chan []*Link
+	queue           []*Link
+	nextqueue       []*Link
 	mu              sync.Mutex      // guards nextqueue
 	wg              sync.WaitGroup  // watches for merging new links
 	Seen            map[string]bool // Full text of address
@@ -56,11 +44,11 @@ type crawlfn func(*Crawler) crawlfn
 
 func Crawl(config *Config) *Crawler {
 	// This should anticipate a failure condition
-	first := MakeNode(0, config.Start)
-	return CrawlList(config, []*Node{first})
+	first := MakeAbsoluteLink(config.Start, "", false)
+	return CrawlList(config, []*Link{first})
 }
 
-func CrawlList(config *Config, q []*Node) *Crawler {
+func CrawlList(config *Config, q []*Link) *Crawler {
 	// FIXME: Should be configurable
 	// also probably handle error
 	wait, _ := time.ParseDuration(config.WaitTime)
@@ -81,7 +69,7 @@ func CrawlList(config *Config, q []*Node) *Crawler {
 		connections: make(chan bool, config.Connections),
 		Seen:        make(map[string]bool),
 		results:     make(chan *Result, 20),
-		newnodes:    make(chan []*Node),
+		newnodes:    make(chan []*Link),
 		queue:       q,
 		Config:      config,
 		client:      client,
@@ -180,6 +168,7 @@ func crawlStartQueue(c *Crawler) crawlfn {
 func crawlNextQueue(c *Crawler) crawlfn {
 	c.queue = c.nextqueue
 	c.nextqueue = nil
+	c.depth++
 	return crawlStartQueue
 }
 
@@ -188,8 +177,8 @@ func crawlStart(c *Crawler) crawlfn {
 	switch {
 	case time.Since(c.LastRequestTime) < c.wait:
 		return crawlWait
-	case node.Depth > c.MaxDepth && c.MaxDepth >= 0:
-		return crawlNext
+	case c.depth > c.MaxDepth && c.MaxDepth >= 0:
+		return nil
 	case !c.WillCrawl(node.Address.String()):
 		return crawlNext
 	default:
@@ -203,7 +192,7 @@ func crawlCheckRobots(c *Crawler) crawlfn {
 		c.addRobots(node.Address.String())
 	}
 	if !c.robots[node.Address.Host].TestAgent(node.Address.RobotsPath(), c.Config.RobotsUserAgent) {
-		result := MakeResult(node.Address, node.Depth)
+		result := MakeResult(node.Address, c.depth)
 		result.Status = "Blocked by robots.txt"
 		c.results <- result
 	}
@@ -267,12 +256,12 @@ func (c *Crawler) merge() {
 	}
 }
 
-func (c *Crawler) fetch(node *Node) {
-	result := MakeResult(node.Address, node.Depth)
+func (c *Crawler) fetch(link *Link) {
+	result := MakeResult(link.Address, c.depth)
 
-	resp, err := c.client.Get(node.Address.String())
+	resp, err := c.client.Get(link.Address.String())
 	if err != nil {
-		go func() { c.newnodes <- []*Node{} }()
+		go func() { c.newnodes <- []*Link{} }()
 		// TODO: Couldn't fetch
 		return
 	}
@@ -284,10 +273,10 @@ func (c *Crawler) fetch(node *Node) {
 
 	// If redirect, add target to list
 	if resp.StatusCode >= 300 && resp.StatusCode < 400 {
-		result.ResolvesTo = MakeAddressFromRelative(node.Address, resp.Header.Get("Location"))
+		result.ResolvesTo = MakeAddressFromRelative(link.Address, resp.Header.Get("Location"))
 		links = []*Link{
 			MakeLink(
-				node.Address,
+				link.Address,
 				resp.Header.Get("Location"),
 				"",
 				false,
@@ -295,17 +284,7 @@ func (c *Crawler) fetch(node *Node) {
 		}
 	}
 	go func() {
-		c.newnodes <- linksToNodes(node.Depth+1, links)
+		c.newnodes <- links
 	}()
 	c.results <- result
-}
-
-func linksToNodes(depth int, links []*Link) (nodes []*Node) {
-	for _, link := range links {
-		nodes = append(nodes, &Node{
-			Depth: depth,
-			Link:  link,
-		})
-	}
-	return
 }
