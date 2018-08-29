@@ -3,18 +3,18 @@ package crawler
 import "net/url"
 
 type Address struct {
-	Address string
-	Scheme  string
-	Opaque  string
-	Host    string
-	Path    string
-	Query   string
+	Full   string
+	Scheme string
+	Opaque string
+	Host   string
+	Path   string
+	Query  string
 }
 
 // Methods
 
 func (a *Address) String() string {
-	return a.Address
+	return a.Full
 }
 
 func (a *Address) RobotsPath() string {
@@ -22,7 +22,7 @@ func (a *Address) RobotsPath() string {
 }
 
 func (a *Address) toURL() *url.URL {
-	u, _ := url.Parse(a.Address) // FIXME: use error
+	u, _ := url.Parse(a.Full) // FIXME: use error
 	return u
 }
 
@@ -42,12 +42,12 @@ func MakeAddressFromURL(u *url.URL) *Address {
 	}
 	u.Fragment = ""
 	return &Address{
-		Address: u.String(),
-		Scheme:  u.Scheme,
-		Opaque:  u.Opaque,
-		Host:    u.Host,
-		Path:    u.EscapedPath(),
-		Query:   u.RawQuery,
+		Full:   u.String(),
+		Scheme: u.Scheme,
+		Opaque: u.Opaque,
+		Host:   u.Host,
+		Path:   u.EscapedPath(),
+		Query:  u.RawQuery,
 	}
 }
 

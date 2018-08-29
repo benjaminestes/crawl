@@ -1,7 +1,7 @@
 package crawler
 
 type Link struct {
-	*Address
+	Address  *Address
 	Anchor   string
 	Href     string
 	Nofollow bool

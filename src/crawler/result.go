@@ -19,8 +19,8 @@ type Pair struct {
 
 type Result struct {
 	// Crawler state
-	*Address
-	Depth int
+	Address *Address `mode:"REQUIRED"`
+	Depth   int      `mode:"REQUIRED"`
 
 	// Meta
 	BodyTextHash string
@@ -35,11 +35,11 @@ type Result struct {
 	Hreflang    []*Hreflang
 
 	// Response
-	Status     string
-	StatusCode int
-	Proto      string
-	ProtoMajor int
-	ProtoMinor int
+	Status     string `mode:"REQUIRED"`
+	StatusCode int    `mode:"REQUIRED"`
+	Proto      string `mode:"REQUIRED"`
+	ProtoMajor int    `mode:"REQUIRED"`
+	ProtoMinor int    `mode:"REQUIRED"`
 	Header     []*Pair
 	ResolvesTo *Address // In case of redirect
 }

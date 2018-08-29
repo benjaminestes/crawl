@@ -20,6 +20,8 @@ Running `crawl` sends a row of newline-delimited JSON to `os.Stdout`. In the exa
 
 ## Use with BigQuery
 
+### Generate up-to-date schema
+
 ## License
 
 MIT

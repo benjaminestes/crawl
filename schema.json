@@ -1,0 +1,310 @@
+[
+	{
+		"mode": "REQUIRED",
+		"name": "Address",
+		"type": "RECORD",
+		"fields": [
+			{
+				"mode": "NULLABLE",
+				"name": "Full",
+				"type": "STRING"
+			},
+			{
+				"mode": "NULLABLE",
+				"name": "Scheme",
+				"type": "STRING"
+			},
+			{
+				"mode": "NULLABLE",
+				"name": "Opaque",
+				"type": "STRING"
+			},
+			{
+				"mode": "NULLABLE",
+				"name": "Host",
+				"type": "STRING"
+			},
+			{
+				"mode": "NULLABLE",
+				"name": "Path",
+				"type": "STRING"
+			},
+			{
+				"mode": "NULLABLE",
+				"name": "Query",
+				"type": "STRING"
+			}
+		]
+	},
+	{
+		"mode": "REQUIRED",
+		"name": "Depth",
+		"type": "INT64"
+	},
+	{
+		"mode": "NULLABLE",
+		"name": "BodyTextHash",
+		"type": "STRING"
+	},
+	{
+		"mode": "NULLABLE",
+		"name": "Description",
+		"type": "STRING"
+	},
+	{
+		"mode": "NULLABLE",
+		"name": "Title",
+		"type": "STRING"
+	},
+	{
+		"mode": "NULLABLE",
+		"name": "H1",
+		"type": "STRING"
+	},
+	{
+		"mode": "NULLABLE",
+		"name": "Robots",
+		"type": "STRING"
+	},
+	{
+		"mode": "NULLABLE",
+		"name": "Canonical",
+		"type": "RECORD",
+		"fields": [
+			{
+				"mode": "NULLABLE",
+				"name": "Address",
+				"type": "RECORD",
+				"fields": [
+					{
+						"mode": "NULLABLE",
+						"name": "Full",
+						"type": "STRING"
+					},
+					{
+						"mode": "NULLABLE",
+						"name": "Scheme",
+						"type": "STRING"
+					},
+					{
+						"mode": "NULLABLE",
+						"name": "Opaque",
+						"type": "STRING"
+					},
+					{
+						"mode": "NULLABLE",
+						"name": "Host",
+						"type": "STRING"
+					},
+					{
+						"mode": "NULLABLE",
+						"name": "Path",
+						"type": "STRING"
+					},
+					{
+						"mode": "NULLABLE",
+						"name": "Query",
+						"type": "STRING"
+					}
+				]
+			},
+			{
+				"mode": "NULLABLE",
+				"name": "Href",
+				"type": "STRING"
+			}
+		]
+	},
+	{
+		"mode": "REPEATED",
+		"name": "Links",
+		"type": "RECORD",
+		"fields": [
+			{
+				"mode": "NULLABLE",
+				"name": "Address",
+				"type": "RECORD",
+				"fields": [
+					{
+						"mode": "NULLABLE",
+						"name": "Full",
+						"type": "STRING"
+					},
+					{
+						"mode": "NULLABLE",
+						"name": "Scheme",
+						"type": "STRING"
+					},
+					{
+						"mode": "NULLABLE",
+						"name": "Opaque",
+						"type": "STRING"
+					},
+					{
+						"mode": "NULLABLE",
+						"name": "Host",
+						"type": "STRING"
+					},
+					{
+						"mode": "NULLABLE",
+						"name": "Path",
+						"type": "STRING"
+					},
+					{
+						"mode": "NULLABLE",
+						"name": "Query",
+						"type": "STRING"
+					}
+				]
+			},
+			{
+				"mode": "NULLABLE",
+				"name": "Anchor",
+				"type": "STRING"
+			},
+			{
+				"mode": "NULLABLE",
+				"name": "Href",
+				"type": "STRING"
+			},
+			{
+				"mode": "NULLABLE",
+				"name": "Nofollow",
+				"type": "BOOL"
+			}
+		]
+	},
+	{
+		"mode": "REPEATED",
+		"name": "Hreflang",
+		"type": "RECORD",
+		"fields": [
+			{
+				"mode": "NULLABLE",
+				"name": "Address",
+				"type": "RECORD",
+				"fields": [
+					{
+						"mode": "NULLABLE",
+						"name": "Full",
+						"type": "STRING"
+					},
+					{
+						"mode": "NULLABLE",
+						"name": "Scheme",
+						"type": "STRING"
+					},
+					{
+						"mode": "NULLABLE",
+						"name": "Opaque",
+						"type": "STRING"
+					},
+					{
+						"mode": "NULLABLE",
+						"name": "Host",
+						"type": "STRING"
+					},
+					{
+						"mode": "NULLABLE",
+						"name": "Path",
+						"type": "STRING"
+					},
+					{
+						"mode": "NULLABLE",
+						"name": "Query",
+						"type": "STRING"
+					}
+				]
+			},
+			{
+				"mode": "NULLABLE",
+				"name": "Href",
+				"type": "STRING"
+			},
+			{
+				"mode": "NULLABLE",
+				"name": "Hreflang",
+				"type": "STRING"
+			}
+		]
+	},
+	{
+		"mode": "REQUIRED",
+		"name": "Status",
+		"type": "STRING"
+	},
+	{
+		"mode": "REQUIRED",
+		"name": "StatusCode",
+		"type": "INT64"
+	},
+	{
+		"mode": "REQUIRED",
+		"name": "Proto",
+		"type": "STRING"
+	},
+	{
+		"mode": "REQUIRED",
+		"name": "ProtoMajor",
+		"type": "INT64"
+	},
+	{
+		"mode": "REQUIRED",
+		"name": "ProtoMinor",
+		"type": "INT64"
+	},
+	{
+		"mode": "REPEATED",
+		"name": "Header",
+		"type": "RECORD",
+		"fields": [
+			{
+				"mode": "NULLABLE",
+				"name": "K",
+				"type": "STRING"
+			},
+			{
+				"mode": "NULLABLE",
+				"name": "V",
+				"type": "STRING"
+			}
+		]
+	},
+	{
+		"mode": "NULLABLE",
+		"name": "ResolvesTo",
+		"type": "RECORD",
+		"fields": [
+			{
+				"mode": "NULLABLE",
+				"name": "Full",
+				"type": "STRING"
+			},
+			{
+				"mode": "NULLABLE",
+				"name": "Scheme",
+				"type": "STRING"
+			},
+			{
+				"mode": "NULLABLE",
+				"name": "Opaque",
+				"type": "STRING"
+			},
+			{
+				"mode": "NULLABLE",
+				"name": "Host",
+				"type": "STRING"
+			},
+			{
+				"mode": "NULLABLE",
+				"name": "Path",
+				"type": "STRING"
+			},
+			{
+				"mode": "NULLABLE",
+				"name": "Query",
+				"type": "STRING"
+			}
+		]
+	}
+]

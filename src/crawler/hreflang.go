@@ -1,7 +1,7 @@
 package crawler
 
 type Hreflang struct {
-	*Address
+	Address  *Address
 	Href     string
 	Hreflang string
 }

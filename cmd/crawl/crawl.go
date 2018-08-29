@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/benjaminestes/crawl/src/crawler"
+	"github.com/benjaminestes/crawl/src/schema"
 )
 
 var config = &crawler.Config{
@@ -20,6 +21,12 @@ var config = &crawler.Config{
 }
 
 func main() {
+	if os.Args[1] == "schema" {
+		j, _ := json.MarshalIndent(schema.BQ, "", "\t")
+		fmt.Printf("%s\n", j)
+		return
+	}
+
 	if len(os.Args) != 3 {
 		fmt.Fprintln(os.Stderr, "expected command and config file path")
 		os.Exit(1)
