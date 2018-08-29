@@ -24,7 +24,6 @@ type Config struct {
 type Crawler struct {
 	depth           int
 	connections     chan bool
-	newnodes        chan []*Link
 	queue           []*Link
 	nextqueue       []*Link
 	mu              sync.Mutex      // guards nextqueue
@@ -68,8 +67,7 @@ func CrawlList(config *Config, q []*Link) *Crawler {
 	c := &Crawler{
 		connections: make(chan bool, config.Connections),
 		Seen:        make(map[string]bool),
-		results:     make(chan *Result, 20),
-		newnodes:    make(chan []*Link),
+		results:     make(chan *Result, config.Connections),
 		queue:       q,
 		Config:      config,
 		client:      client,
@@ -177,8 +175,6 @@ func crawlStart(c *Crawler) crawlfn {
 	switch {
 	case time.Since(c.LastRequestTime) < c.wait:
 		return crawlWait
-	case c.depth > c.MaxDepth && c.MaxDepth >= 0:
-		return nil
 	case !c.WillCrawl(node.Address.String()):
 		return crawlNext
 	default:
@@ -218,17 +214,11 @@ func crawlDo(c *Crawler) crawlfn {
 	// This allows me to spawn no more than 20 fetches
 	c.connections <- true
 	c.resetWait()
-	go func() {
-		defer func() { <-c.connections }()
-		c.fetch(node) // FIXME: implement actual queue?
-	}()
-
-	// This spawns a merge for each fetch — there could be > than 20
-	// active in principle
 	c.wg.Add(1)
 	go func() {
 		defer c.wg.Done()
-		c.merge()
+		defer func() { <-c.connections }()
+		c.fetch(node) // FIXME: implement actual queue?
 	}()
 
 	return crawlNext
@@ -239,17 +229,19 @@ func crawlAwait(c *Crawler) crawlfn {
 	return crawlNextQueue
 }
 
-func (c *Crawler) merge() {
-	nodes := <-c.newnodes
-	for _, node := range nodes {
-		if node.Address == nil || !c.WillCrawl(node.Address.String()) {
+func (c *Crawler) merge(links []*Link) {
+	if !(c.depth < c.MaxDepth) {
+		return
+	}
+	for _, link := range links {
+		if link.Address == nil || !c.WillCrawl(link.Address.String()) {
 			continue
 		}
 		c.mu.Lock()
-		if _, ok := c.Seen[node.Address.String()]; !ok {
-			if !(node.Nofollow && c.RespectNofollow) {
-				c.Seen[node.Address.String()] = true
-				c.nextqueue = append(c.nextqueue, node)
+		if _, ok := c.Seen[link.Address.String()]; !ok {
+			if !(link.Nofollow && c.RespectNofollow) {
+				c.Seen[link.Address.String()] = true
+				c.nextqueue = append(c.nextqueue, link)
 			}
 		}
 		c.mu.Unlock()
@@ -261,8 +253,6 @@ func (c *Crawler) fetch(link *Link) {
 
 	resp, err := c.client.Get(link.Address.String())
 	if err != nil {
-		go func() { c.newnodes <- []*Link{} }()
-		// TODO: Couldn't fetch
 		return
 	}
 	defer resp.Body.Close()
@@ -283,8 +273,6 @@ func (c *Crawler) fetch(link *Link) {
 			),
 		}
 	}
-	go func() {
-		c.newnodes <- links
-	}()
+	c.merge(links)
 	c.results <- result
 }
