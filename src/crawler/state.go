@@ -2,6 +2,8 @@ package crawler
 
 import (
 	"time"
+
+	"github.com/benjaminestes/crawl/src/crawler/data"
 )
 
 type crawlfn func(*Crawler) crawlfn
@@ -31,7 +33,7 @@ func crawlCheckRobots(c *Crawler) crawlfn {
 		c.addRobots(addr.Full)
 	}
 	if c.robots[addr.Host] != nil && !c.robots[addr.Host].TestAgent(addr.RobotsPath(), c.Config.RobotsUserAgent) {
-		result := MakeResult(addr, c.depth)
+		result := data.MakeResult(addr, c.depth)
 		result.Status = "Blocked by robots.txt"
 		c.results <- result
 		return crawlNext

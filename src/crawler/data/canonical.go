@@ -1,4 +1,4 @@
-package crawler
+package data
 
 type Canonical struct {
 	Address *Address

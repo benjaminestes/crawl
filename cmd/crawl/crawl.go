@@ -11,7 +11,8 @@ import (
 	"time"
 
 	"github.com/benjaminestes/crawl/src/crawler"
-	"github.com/benjaminestes/crawl/src/schema"
+	"github.com/benjaminestes/crawl/src/crawler/data"
+	"github.com/benjaminestes/crawl/src/crawler/schema"
 )
 
 var config = &crawler.Config{
@@ -78,10 +79,10 @@ func crawlSite(config *crawler.Config) *crawler.Crawler {
 }
 
 func crawlList(config *crawler.Config) *crawler.Crawler {
-	var queue []*crawler.Address
+	var queue []*data.Address
 	scanner := bufio.NewScanner(os.Stdin)
 	for scanner.Scan() {
-		n := crawler.MakeAddressFromString(scanner.Text())
+		n := data.MakeAddressFromString(scanner.Text())
 		queue = append(queue, n)
 	}
 	config.MaxDepth = 0

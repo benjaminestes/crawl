@@ -7,18 +7,19 @@ import (
 	"sync"
 	"time"
 
+	"github.com/benjaminestes/crawl/src/crawler/data"
 	"github.com/temoto/robotstxt"
 )
 
 type Crawler struct {
 	depth           int
 	connections     chan bool
-	queue           []*Address
-	nextqueue       []*Address
+	queue           []*data.Address
+	nextqueue       []*data.Address
 	mu              sync.Mutex      // guards nextqueue
 	wg              sync.WaitGroup  // watches for fetches
 	seen            map[string]bool // Full text of address
-	results         chan *Result
+	results         chan *data.Result
 	robots          map[string]*robotstxt.RobotsData
 	lastRequestTime time.Time
 	wait            time.Duration
@@ -28,13 +29,18 @@ type Crawler struct {
 	*Config
 }
 
+// Starts and returns a pointer to an active crawler. Crawling is done
+// asynchronously, so many connections may be made just by instantiating
+// a crawler with this function.
 func Crawl(config *Config) *Crawler {
 	// This should anticipate a failure condition
-	first := MakeAddressFromString(config.Start)
-	return CrawlList(config, []*Address{first})
+	first := data.MakeAddressFromString(config.Start)
+	return CrawlList(config, []*data.Address{first})
 }
 
-func CrawlList(config *Config, q []*Address) *Crawler {
+// Behaves the same as Crawl(), but ignores the concept of depth. The
+// returned crawl object fetches the URLs in the provided queue only.
+func CrawlList(config *Config, q []*data.Address) *Crawler {
 	// FIXME: Should handle error
 	wait, _ := time.ParseDuration(config.WaitTime)
 
@@ -51,7 +57,7 @@ func CrawlList(config *Config, q []*Address) *Crawler {
 	c := &Crawler{
 		connections: make(chan bool, config.Connections),
 		seen:        make(map[string]bool),
-		results:     make(chan *Result, config.Connections),
+		results:     make(chan *data.Result, config.Connections),
 		queue:       q,
 		Config:      config,
 		client:      client,
@@ -87,7 +93,7 @@ func (c *Crawler) preparePatterns(include, exclude []string) {
 	}
 }
 
-func (c *Crawler) WillCrawl(u string) bool {
+func (c *Crawler) willCrawl(u string) bool {
 	for _, p := range c.exclude {
 		if p.MatchString(u) {
 			return false
@@ -128,7 +134,13 @@ func (c *Crawler) addRobots(u string) {
 	c.robots[url.Host] = robots
 }
 
-func (c *Crawler) Next() *Result {
+// Returns the next result from the crawl. Results are guaranteed to come
+// out in order ascending by depth. Within a "level" of depth, there is
+// no guarantee as to which URLs will be crawled first.
+//
+// Result objects are suitable for Marshling into JSON format and conform
+// to the schema exported by the crawler.Schema package.
+func (c *Crawler) Next() *data.Result {
 	node, ok := <-c.results
 	if !ok {
 		return nil
@@ -140,13 +152,13 @@ func (c *Crawler) resetWait() {
 	c.lastRequestTime = time.Now()
 }
 
-func (c *Crawler) merge(links []*Link) {
+func (c *Crawler) merge(links []*data.Link) {
 	// This is how the crawler terminates — it will encounter an empty queue.
 	if !(c.depth < c.MaxDepth) {
 		return
 	}
 	for _, link := range links {
-		if link.Address == nil || !c.WillCrawl(link.Address.Full) {
+		if link.Address == nil || !c.willCrawl(link.Address.Full) {
 			continue
 		}
 		c.mu.Lock()
@@ -160,8 +172,8 @@ func (c *Crawler) merge(links []*Link) {
 	}
 }
 
-func (c *Crawler) fetch(addr *Address) {
-	result := MakeResult(addr, c.depth)
+func (c *Crawler) fetch(addr *data.Address) {
+	result := data.MakeResult(addr, c.depth)
 
 	resp, err := c.client.Get(addr.Full)
 	if err != nil {
@@ -175,8 +187,8 @@ func (c *Crawler) fetch(addr *Address) {
 
 	// If redirect, add target to list
 	if resp.StatusCode >= 300 && resp.StatusCode < 400 {
-		result.ResolvesTo = MakeAddressFromRelative(addr, resp.Header.Get("Location"))
-		links = []*Link{MakeLink(addr, resp.Header.Get("Location"), "", false)}
+		result.ResolvesTo = data.MakeAddressFromRelative(addr, resp.Header.Get("Location"))
+		links = []*data.Link{data.MakeLink(addr, resp.Header.Get("Location"), "", false)}
 	}
 	c.merge(links)
 	c.results <- result

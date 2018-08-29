@@ -1,10 +1,8 @@
-package crawler
+package data
 
 import (
-	// "bytes"
 	"crypto/sha512"
 	"encoding/base64"
-	// "io/ioutil"
 	"net/http"
 	"strings"
 
