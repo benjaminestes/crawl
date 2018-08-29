@@ -10,28 +10,17 @@ import (
 	"github.com/temoto/robotstxt"
 )
 
-type Config struct {
-	Connections     int
-	RobotsUserAgent string
-	Include         []string
-	Exclude         []string
-	Start           string
-	RespectNofollow bool
-	MaxDepth        int
-	WaitTime        string
-}
-
 type Crawler struct {
 	depth           int
 	connections     chan bool
-	queue           []*Link
-	nextqueue       []*Link
+	queue           []*Address
+	nextqueue       []*Address
 	mu              sync.Mutex      // guards nextqueue
-	wg              sync.WaitGroup  // watches for merging new links
-	Seen            map[string]bool // Full text of address
+	wg              sync.WaitGroup  // watches for fetches
+	seen            map[string]bool // Full text of address
 	results         chan *Result
 	robots          map[string]*robotstxt.RobotsData
-	LastRequestTime time.Time
+	lastRequestTime time.Time
 	wait            time.Duration
 	include         []*regexp.Regexp
 	exclude         []*regexp.Regexp
@@ -39,34 +28,29 @@ type Crawler struct {
 	*Config
 }
 
-type crawlfn func(*Crawler) crawlfn
-
 func Crawl(config *Config) *Crawler {
 	// This should anticipate a failure condition
-	first := MakeAbsoluteLink(config.Start, "", false)
-	return CrawlList(config, []*Link{first})
+	first := MakeAddressFromString(config.Start)
+	return CrawlList(config, []*Address{first})
 }
 
-func CrawlList(config *Config, q []*Link) *Crawler {
-	// FIXME: Should be configurable
-	// also probably handle error
+func CrawlList(config *Config, q []*Address) *Crawler {
+	// FIXME: Should handle error
 	wait, _ := time.ParseDuration(config.WaitTime)
-
-	tr := &http.Transport{
-		MaxIdleConns:    config.Connections,
-		IdleConnTimeout: 30 * time.Second,
-	}
 
 	client := &http.Client{
 		CheckRedirect: func(req *http.Request, via []*http.Request) error {
 			return http.ErrUseLastResponse
 		},
-		Transport: tr,
+		Transport: &http.Transport{
+			MaxIdleConns:    config.Connections,
+			IdleConnTimeout: 30 * time.Second,
+		},
 	}
 
 	c := &Crawler{
 		connections: make(chan bool, config.Connections),
-		Seen:        make(map[string]bool),
+		seen:        make(map[string]bool),
 		results:     make(chan *Result, config.Connections),
 		queue:       q,
 		Config:      config,
@@ -76,8 +60,8 @@ func CrawlList(config *Config, q []*Link) *Crawler {
 	}
 	c.preparePatterns(config.Include, config.Exclude)
 
-	for _, v := range c.queue {
-		c.Seen[v.Address.String()] = true
+	for _, addr := range c.queue {
+		c.seen[addr.Full] = true
 	}
 
 	go func() {
@@ -153,105 +137,33 @@ func (c *Crawler) Next() *Result {
 }
 
 func (c *Crawler) resetWait() {
-	c.LastRequestTime = time.Now()
-}
-
-func crawlStartQueue(c *Crawler) crawlfn {
-	if len(c.queue) > 0 {
-		return crawlStart
-	}
-	return nil
-}
-
-func crawlNextQueue(c *Crawler) crawlfn {
-	c.queue = c.nextqueue
-	c.nextqueue = nil
-	c.depth++
-	return crawlStartQueue
-}
-
-func crawlStart(c *Crawler) crawlfn {
-	node := c.queue[0] // If this panics, there is a logic error.
-	switch {
-	case time.Since(c.LastRequestTime) < c.wait:
-		return crawlWait
-	case !c.WillCrawl(node.Address.String()):
-		return crawlNext
-	default:
-		return crawlDo
-	}
-}
-
-func crawlCheckRobots(c *Crawler) crawlfn {
-	node := c.queue[0]
-	if _, ok := c.robots[node.Address.Host]; !ok {
-		c.addRobots(node.Address.String())
-	}
-	if !c.robots[node.Address.Host].TestAgent(node.Address.RobotsPath(), c.Config.RobotsUserAgent) {
-		result := MakeResult(node.Address, c.depth)
-		result.Status = "Blocked by robots.txt"
-		c.results <- result
-	}
-	return crawlDo
-}
-
-func crawlWait(c *Crawler) crawlfn {
-	time.Sleep(c.wait - time.Since(c.LastRequestTime))
-	return crawlStart
-}
-
-func crawlNext(c *Crawler) crawlfn {
-	c.queue = c.queue[1:]
-	if len(c.queue) > 0 {
-		return crawlStart
-	}
-	return crawlAwait
-}
-
-func crawlDo(c *Crawler) crawlfn {
-	node := c.queue[0]
-
-	// This allows me to spawn no more than 20 fetches
-	c.connections <- true
-	c.resetWait()
-	c.wg.Add(1)
-	go func() {
-		defer c.wg.Done()
-		defer func() { <-c.connections }()
-		c.fetch(node) // FIXME: implement actual queue?
-	}()
-
-	return crawlNext
-}
-
-func crawlAwait(c *Crawler) crawlfn {
-	c.wg.Wait()
-	return crawlNextQueue
+	c.lastRequestTime = time.Now()
 }
 
 func (c *Crawler) merge(links []*Link) {
+	// This is how the crawler terminates — it will encounter an empty queue.
 	if !(c.depth < c.MaxDepth) {
 		return
 	}
 	for _, link := range links {
-		if link.Address == nil || !c.WillCrawl(link.Address.String()) {
+		if link.Address == nil || !c.WillCrawl(link.Address.Full) {
 			continue
 		}
 		c.mu.Lock()
-		if _, ok := c.Seen[link.Address.String()]; !ok {
+		if _, ok := c.seen[link.Address.Full]; !ok {
 			if !(link.Nofollow && c.RespectNofollow) {
-				c.Seen[link.Address.String()] = true
-				c.nextqueue = append(c.nextqueue, link)
+				c.seen[link.Address.Full] = true
+				c.nextqueue = append(c.nextqueue, link.Address)
 			}
 		}
 		c.mu.Unlock()
 	}
 }
 
-func (c *Crawler) fetch(link *Link) {
-	result := MakeResult(link.Address, c.depth)
+func (c *Crawler) fetch(addr *Address) {
+	result := MakeResult(addr, c.depth)
 
-	resp, err := c.client.Get(link.Address.String())
+	resp, err := c.client.Get(addr.Full)
 	if err != nil {
 		return
 	}
@@ -263,15 +175,8 @@ func (c *Crawler) fetch(link *Link) {
 
 	// If redirect, add target to list
 	if resp.StatusCode >= 300 && resp.StatusCode < 400 {
-		result.ResolvesTo = MakeAddressFromRelative(link.Address, resp.Header.Get("Location"))
-		links = []*Link{
-			MakeLink(
-				link.Address,
-				resp.Header.Get("Location"),
-				"",
-				false,
-			),
-		}
+		result.ResolvesTo = MakeAddressFromRelative(addr, resp.Header.Get("Location"))
+		links = []*Link{MakeLink(addr, resp.Header.Get("Location"), "", false)}
 	}
 	c.merge(links)
 	c.results <- result
