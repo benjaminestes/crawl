@@ -2,6 +2,7 @@ package crawler
 
 type Config struct {
 	Connections     int
+	UserAgent       string
 	RobotsUserAgent string
 	Include         []string
 	Exclude         []string

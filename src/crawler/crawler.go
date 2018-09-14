@@ -175,7 +175,14 @@ func (c *Crawler) merge(links []*data.Link) {
 func (c *Crawler) fetch(addr *data.Address) {
 	result := data.MakeResult(addr, c.depth)
 
-	resp, err := c.client.Get(addr.Full)
+	req, err := http.NewRequest("GET", addr.Full, nil)
+	if err != nil {
+		return
+	}
+
+	req.Header.Set("User-Agent", c.Config.UserAgent)
+
+	resp, err := c.client.Do(req)
 	if err != nil {
 		return
 	}
