@@ -12,7 +12,7 @@ import (
 	"os"
 	"reflect"
 
-	"github.com/benjaminestes/crawl/src/crawler"
+	"github.com/benjaminestes/crawl/src/crawler/data"
 )
 
 type SchemaItem struct {
@@ -43,7 +43,7 @@ func main() {
 	fmt.Fprintln(&buf, "//go:generate go run gen.go\n")
 	fmt.Fprintln(&buf, "package schema")
 
-	r := &crawler.Result{}
+	r := &data.Result{}
 	t := reflect.TypeOf(*r)
 
 	fmt.Fprintln(&buf, "var BQ = []SchemaItem{")

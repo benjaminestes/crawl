@@ -58,6 +58,7 @@ func crawlDo(c *Crawler) crawlfn {
 }
 
 func crawlNext(c *Crawler) crawlfn {
+	c.queue[0] = nil
 	c.queue = c.queue[1:]
 	if len(c.queue) > 0 {
 		return crawlStart

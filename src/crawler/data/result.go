@@ -17,29 +17,29 @@ type Pair struct {
 
 type Result struct {
 	// Crawler state
-	Address *Address `mode:"REQUIRED"`
+	Address *Address `json:",omitempty"`
 	Depth   int      `mode:"REQUIRED"`
 
 	// Meta
-	BodyTextHash string
+	BodyTextHash string `json:",omitempty"`
 
 	// Content
 	Description string
 	Title       string
 	H1          string
 	Robots      string
-	Canonical   *Canonical
-	Links       []*Link
-	Hreflang    []*Hreflang
+	Canonical   *Canonical  `json:",omitempty"`
+	Links       []*Link     `json:",omitempty"`
+	Hreflang    []*Hreflang `json:",omitempty"`
 
 	// Response
-	Status     string `mode:"REQUIRED"`
-	StatusCode int    `mode:"REQUIRED"`
-	Proto      string `mode:"REQUIRED"`
-	ProtoMajor int    `mode:"REQUIRED"`
-	ProtoMinor int    `mode:"REQUIRED"`
-	Header     []*Pair
-	ResolvesTo *Address // In case of redirect
+	Status     string   `json:",omitempty"`
+	StatusCode int      `json:",omitempty"`
+	Proto      string   `json:",omitempty"`
+	ProtoMajor int      `json:",omitempty"`
+	ProtoMinor int      `json:",omitempty"`
+	Header     []*Pair  `json:",omitempty"`
+	ResolvesTo *Address `json:",omitempty"` // In case of redirect
 }
 
 func MakeResult(addr *Address, depth int) *Result {

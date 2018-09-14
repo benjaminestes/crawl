@@ -8,7 +8,7 @@ var BQ = []SchemaItem{
 	{
 		Name: "Address",
 		Type: "RECORD",
-		Mode: "REQUIRED",
+		Mode: "NULLABLE",
 		Fields: []SchemaItem{
 			{
 				Name: "Full",
@@ -237,27 +237,27 @@ var BQ = []SchemaItem{
 	{
 		Name: "Status",
 		Type: "STRING",
-		Mode: "REQUIRED",
+		Mode: "NULLABLE",
 	},
 	{
 		Name: "StatusCode",
 		Type: "INT64",
-		Mode: "REQUIRED",
+		Mode: "NULLABLE",
 	},
 	{
 		Name: "Proto",
 		Type: "STRING",
-		Mode: "REQUIRED",
+		Mode: "NULLABLE",
 	},
 	{
 		Name: "ProtoMajor",
 		Type: "INT64",
-		Mode: "REQUIRED",
+		Mode: "NULLABLE",
 	},
 	{
 		Name: "ProtoMinor",
 		Type: "INT64",
-		Mode: "REQUIRED",
+		Mode: "NULLABLE",
 	},
 	{
 		Name: "Header",

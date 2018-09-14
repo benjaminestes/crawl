@@ -1,6 +1,6 @@
 [
 	{
-		"mode": "REQUIRED",
+		"mode": "NULLABLE",
 		"name": "Address",
 		"type": "RECORD",
 		"fields": [
@@ -229,27 +229,27 @@
 		]
 	},
 	{
-		"mode": "REQUIRED",
+		"mode": "NULLABLE",
 		"name": "Status",
 		"type": "STRING"
 	},
 	{
-		"mode": "REQUIRED",
+		"mode": "NULLABLE",
 		"name": "StatusCode",
 		"type": "INT64"
 	},
 	{
-		"mode": "REQUIRED",
+		"mode": "NULLABLE",
 		"name": "Proto",
 		"type": "STRING"
 	},
 	{
-		"mode": "REQUIRED",
+		"mode": "NULLABLE",
 		"name": "ProtoMajor",
 		"type": "INT64"
 	},
 	{
-		"mode": "REQUIRED",
+		"mode": "NULLABLE",
 		"name": "ProtoMinor",
 		"type": "INT64"
 	},
