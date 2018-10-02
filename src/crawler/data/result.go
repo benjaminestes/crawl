@@ -75,12 +75,23 @@ func hydrateHeader(r *Result, resp *http.Response) {
 func hydrateHTMLContent(r *Result, doc *html.Node) {
 	r.Title = scrape.GetText(scrape.QueryNode("title", nil, doc))
 	r.H1 = scrape.GetText(scrape.QueryNode("h1", nil, doc))
-	r.Description = scrape.GetAttribute("content", scrape.QueryNode("meta", map[string]string{
-		"name": "description",
-	}, doc))
-	r.Robots = scrape.GetAttribute("content", scrape.QueryNode("meta", map[string]string{
-		"name": "robots",
-	}, doc))
+	r.Description = scrape.GetAttribute(
+		"content",
+		scrape.QueryNode(
+			"meta",
+			map[string]string{
+				"name": "description",
+			},
+			doc,
+		))
+	r.Robots = scrape.GetAttribute(
+		"content",
+		scrape.QueryNode("meta",
+			map[string]string{
+				"name": "robots",
+			},
+			doc,
+		))
 	r.Canonical = getCanonical(r.Address, doc)
 	r.Hreflang = getHreflang(r.Address, doc)
 	r.Links = getLinks(r.Address, doc)
