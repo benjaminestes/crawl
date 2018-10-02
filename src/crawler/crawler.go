@@ -1,3 +1,7 @@
+// Copyright 2018 Benjamin Estes. All rights reserved.  Use of this
+// source code is governed by an MIT-style license that can be found
+// in the LICENSE file.
+
 package crawler
 
 import (
@@ -12,47 +16,77 @@ import (
 )
 
 type Crawler struct {
-	depth           int
-	connections     chan bool
-	queue           []*data.Address
-	nextqueue       []*data.Address
-	mu              sync.Mutex      // guards nextqueue
-	wg              sync.WaitGroup  // watches for fetches
-	seen            map[string]bool // Full text of address
-	results         chan *data.Result
-	robots          map[string]*robotstxt.RobotsData
-	lastRequestTime time.Time
+	depth   int
+	queue   []*data.Address
+	seen    map[string]bool // key = full text of URL
+	results chan *data.Result
+
+	// robots maintains a robots.txt matcher for every encountered
+	// domain
+	robots map[string]*robotstxt.RobotsData
+
+	// mu guards nextqueue when multiple fetches may try to write
+	// to it simultaneously
+	nextqueue []*data.Address
+	mu        sync.Mutex
+
+	// wg waits for all spawned fetches to complete before
+	// crawling the next level
+	wg sync.WaitGroup
+
+	// connections is a semaphore ensuring no more than
+	// Config.Connections connections are active
+	connections chan bool
+
+	// wait is the parsed version of Config.WaitTime
 	wait            time.Duration
-	include         []*regexp.Regexp
-	exclude         []*regexp.Regexp
-	client          *http.Client
+	lastRequestTime time.Time
+
+	// (in|ex)clude are the compiled versions of
+	// Config.(In|Ex)clude, which are []string.
+	include []*regexp.Regexp
+	exclude []*regexp.Regexp
+
+	client *http.Client
 	*Config
 }
 
-// Starts and returns a pointer to an active crawler. Crawling is done
-// asynchronously, so many connections may be made just by instantiating
-// a crawler with this function.
+// Crawl creates and starts a Crawler, and returns a pointer to it.
+// The Crawler is a state machine running in its own
+// goroutine. Therefore, calling this function may initiate many
+// network requests, even before any results are requested from it.
 func Crawl(config *Config) *Crawler {
 	// This should anticipate a failure condition
 	first := data.MakeAddressFromString(config.Start)
 	return CrawlList(config, []*data.Address{first})
 }
 
-// Behaves the same as Crawl(), but ignores the concept of depth. The
-// returned crawl object fetches the URLs in the provided queue only.
-func CrawlList(config *Config, q []*data.Address) *Crawler {
-	// FIXME: Should handle error
-	wait, _ := time.ParseDuration(config.WaitTime)
-
-	client := &http.Client{
+// initializeClient uses a config object to create an http.Client
+// that conforms to the end-user's requirements.
+func initializedClient(config *Config) *http.Client {
+	return &http.Client{
+		// Because we're checking the behavior of specific
+		// URLs to understand whether they behave as expected,
+		// we do not want to follow redirects.
 		CheckRedirect: func(req *http.Request, via []*http.Request) error {
 			return http.ErrUseLastResponse
 		},
 		Transport: &http.Transport{
-			MaxIdleConns:    config.Connections,
+			MaxIdleConns: config.Connections,
+			// FIXME: make configurable
 			IdleConnTimeout: 30 * time.Second,
 		},
 	}
+}
+
+// CrawlList starts and returns a *Crawler that is working from an
+// input slice of Addresses rather than the start URL specified in
+// config.
+func CrawlList(config *Config, q []*data.Address) *Crawler {
+	// FIXME: Should handle error
+	wait, _ := time.ParseDuration(config.WaitTime)
+
+	client := initializedClient(config)
 
 	c := &Crawler{
 		connections: make(chan bool, config.Connections),
