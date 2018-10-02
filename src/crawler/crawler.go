@@ -86,76 +86,98 @@ func CrawlList(config *Config, q []*data.Address) *Crawler {
 	// FIXME: Should handle error
 	wait, _ := time.ParseDuration(config.WaitTime)
 
-	client := initializedClient(config)
-
 	c := &Crawler{
+		client:      initializedClient(config),
 		connections: make(chan bool, config.Connections),
 		seen:        make(map[string]bool),
 		results:     make(chan *data.Result, config.Connections),
 		queue:       q,
 		Config:      config,
-		client:      client,
 		wait:        wait,
 		robots:      make(map[string]*robotstxt.RobotsData),
+		include:     preparePattern(config.Include),
+		exclude:     preparePattern(config.Exclude),
 	}
-	c.preparePatterns(config.Include, config.Exclude)
 
+	// If a URL has not been seen when the crawler processes a
+	// link, that URL will be added to the next queue to crawl. It
+	// does not impact whether a URL in the current queue will be
+	// crawled. Therefore, we add all URLs from the initial queue
+	// to the set of URLs that have been seen, before the crawl
+	// starts.
 	for _, addr := range c.queue {
 		c.seen[addr.Full] = true
 	}
 
-	go func() {
-		for f := crawlStartQueue; f != nil; {
-			f = f(c)
-		}
-		close(c.results)
-	}()
+	c.start()
 
 	return c
 }
 
-// Methods
-
-func (c *Crawler) preparePatterns(include, exclude []string) {
-	for _, s := range include {
-		p := regexp.MustCompile(s)
-		c.include = append(c.include, p)
-	}
-	for _, s := range exclude {
-		p := regexp.MustCompile(s)
-		c.exclude = append(c.exclude, p)
-	}
+// start begins the state machine for the crawler in its own goroutine
+// and returns control to the calling function.
+func (c *Crawler) start() {
+	go func() {
+		for f := crawlStartQueue; f != nil; f = f(c) {
+		}
+		close(c.results)
+	}()
 }
 
-func (c *Crawler) willCrawl(u string) bool {
-	for _, p := range c.exclude {
-		if p.MatchString(u) {
+// preparePattern takes a []string of regexp patterns and compiles them.
+func preparePattern(patterns []string) (compiled []*regexp.Regexp) {
+	for _, s := range patterns {
+		r := regexp.MustCompile(s)
+		compiled = append(compiled, r)
+	}
+	return
+}
+
+// willCrawl says that a string representing a URL will or will not be
+// included in a crawl based on the include and exclude fields of the
+// Crawler object.
+func (c *Crawler) willCrawl(fullurl string) bool {
+	// 1. If a URL matches any exclude rule, it will not be
+	// crawled.
+	for _, r := range c.exclude {
+		if r.MatchString(fullurl) {
 			return false
 		}
 	}
 
-	for _, p := range c.include {
-		if p.MatchString(u) {
+	// 2. If a URL matches any include rule, it will be crawled.
+	for _, r := range c.include {
+		if r.MatchString(fullurl) {
 			return true
 		}
 	}
 
+	// 3. If a URL matches neither an exclude nor include rule,
+	// then the presence or absence of any include rules
+	// determines whether it will be crawled. If there are no
+	// include rules, then the URL will still be crawled.
 	if len(c.include) > 0 {
 		return false
 	}
 	return true
 }
 
-func (c *Crawler) addRobots(u string) {
-	url, err := url.Parse(u)
+// addRobots creates a robotstxt matcher from a url string.
+// The domain and scheme are extracted from the string,
+// and used to request the appropriate file.
+func (c *Crawler) addRobots(fullurl string) {
+	url, err := url.Parse(fullurl)
 	if err != nil {
 		return
 	}
 
-	// Now we've "seen" this host.
+	robotsPath := url.Scheme + "://" + url.Host + "/robots.txt"
+
+	// Now we've "seen" this host. If we fail to get a robots.txt
+	// file, we don't want to keep checking over and over.
 	c.robots[url.Host] = nil
 
-	resp, err := http.Get(url.Scheme + "://" + url.Host + "/robots.txt")
+	resp, err := http.Get(robotsPath)
 	if err != nil || resp.StatusCode != 200 {
 		return
 	}
@@ -182,10 +204,12 @@ func (c *Crawler) Next() *data.Result {
 	return node
 }
 
+// resetWait sets the last time the crawler spawned a request.
 func (c *Crawler) resetWait() {
 	c.lastRequestTime = time.Now()
 }
 
+// merge
 func (c *Crawler) merge(links []*data.Link) {
 	// This is how the crawler terminates — it will encounter an empty queue.
 	if !(c.depth < c.MaxDepth) {
