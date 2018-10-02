@@ -1,3 +1,9 @@
+/*
+    Generate a table with one record for each hreflang tag on the site.
+    This record includes whether the hreflang tag is reciprocated on
+    the target page.
+*/
+
 WITH
     q AS (
         SELECT

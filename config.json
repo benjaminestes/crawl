@@ -3,7 +3,7 @@
     "Include": [
         "^(https?://)?www\\.example\\.com/.*"
     ],
-    "Exclude": [ ],
+    "Exclude": [],
 
     "MaxDepth": 3,
 
