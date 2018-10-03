@@ -1,11 +1,6 @@
-/*
-
-Count the unique instances of each title from the crawl. Then, produce
-a table with one row for each page, the title of the page, and the
-number of pages that have that title in total.
-
-*/
-
+-- Count the unique instances of each title from the crawl. Then,
+-- produce a table with one row for each page, the title of the page,
+-- and the number of pages that have that title in total.
 WITH
 	q AS (SELECT * FROM crawl),
 	
