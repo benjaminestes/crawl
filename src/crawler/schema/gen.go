@@ -24,7 +24,6 @@ type SchemaItem struct {
 }
 
 func genFile(name string, buf *bytes.Buffer) {
-	fmt.Println(buf)
 	b, err := format.Source(buf.Bytes())
 	if err != nil {
 		fmt.Fprintln(os.Stderr, err)
