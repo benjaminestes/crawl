@@ -1,3 +1,13 @@
+// Copyright 2018 Benjamin Estes. All rights reserved.  Use of this
+// source code is governed by an MIT-style license that can be found
+// in the LICENSE file.
+
+// This file generates a struct which, when marshalled into JSON, will
+// be a string representing a valid BigQuery schema. It needs to be re-run
+// only if the data.Result struct changes.
+//
+// Update using `go generate gen.go`.
+
 // +build ignore
 
 //go:generate go run gen.go
