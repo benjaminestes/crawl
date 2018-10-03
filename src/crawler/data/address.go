@@ -11,8 +11,6 @@ type Address struct {
 	Query  string
 }
 
-// Methods
-
 func (a *Address) String() string {
 	return a.Full
 }
@@ -25,8 +23,6 @@ func (a *Address) toURL() *url.URL {
 	u, _ := url.Parse(a.Full) // FIXME: use error
 	return u
 }
-
-// Functions
 
 func MakeAddressFromString(addr string) *Address {
 	u, err := url.Parse(addr)
