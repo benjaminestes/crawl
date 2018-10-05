@@ -16,9 +16,9 @@ import (
 	"strings"
 	"time"
 
-	"github.com/benjaminestes/crawl/src/crawler"
-	"github.com/benjaminestes/crawl/src/crawler/data"
-	"github.com/benjaminestes/crawl/src/crawler/schema"
+	"github.com/benjaminestes/crawl/crawler"
+	"github.com/benjaminestes/crawl/crawler/data"
+	"github.com/benjaminestes/crawl/crawler/schema"
 )
 
 var config = &crawler.Config{
@@ -31,6 +31,7 @@ func main() {
 	schemaCommand := flag.NewFlagSet("schema", flag.ExitOnError)
 	spiderCommand := flag.NewFlagSet("spider", flag.ExitOnError)
 	listCommand := flag.NewFlagSet("list", flag.ExitOnError)
+	listType := listCommand.String("format", "text", "format of input for list mode: {text|xml}")
 
 	if len(os.Args) < 2 {
 		log.Fatal(fmt.Errorf("expected command"))
@@ -58,6 +59,9 @@ func main() {
 		}
 		config := configFromFile(listCommand.Arg(0))
 		queue := listFromReader(os.Stdin)
+		if *listType == "xml" {
+			queue = listFromReader(os.Stdin)
+		}
 		c = crawlList(config, queue)
 	default:
 		flag.PrintDefaults()

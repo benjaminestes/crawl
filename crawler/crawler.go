@@ -11,7 +11,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/benjaminestes/crawl/src/crawler/data"
+	"github.com/benjaminestes/crawl/crawler/data"
 	"github.com/temoto/robotstxt"
 )
 

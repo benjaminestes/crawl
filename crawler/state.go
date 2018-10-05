@@ -7,7 +7,7 @@ package crawler
 import (
 	"time"
 
-	"github.com/benjaminestes/crawl/src/crawler/data"
+	"github.com/benjaminestes/crawl/crawler/data"
 )
 
 // A crawlfn represents a state of the crawler state machine.  Its
