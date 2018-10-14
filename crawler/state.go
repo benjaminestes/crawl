@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/benjaminestes/crawl/crawler/data"
+	"github.com/benjaminestes/robots"
 )
 
 // A crawlfn represents a state of the crawler state machine.  Its
@@ -39,15 +40,21 @@ func crawlWait(c *Crawler) crawlfn {
 	return crawlStart
 }
 
-// crawlCheckRobots verifies that the domain being crawled allows the
+// crawlcheckrobots verifies that the domain being crawled allows the
 // URL to be requested. If we get here, it means we've already decided
 // the URL is in the scope of the crawl as defined by the end user.
 func crawlCheckRobots(c *Crawler) crawlfn {
 	addr := c.queue[0]
-	if _, ok := c.robots[addr.Host]; !ok {
-		c.addRobots(addr.Full)
+	rtxtURL, err := robots.Locate(addr.Full)
+	if err != nil {
+		// Couldn't parse URL. Is this the desired behavior?
+		return crawlNext
 	}
-	if c.robots[addr.Host] != nil && !c.robots[addr.Host].TestAgent(addr.RobotsPath(), c.RobotsUserAgent) {
+	if _, ok := c.robots[rtxtURL]; !ok {
+		c.addRobots(rtxtURL)
+	}
+	if !c.robots[rtxtURL](addr.Full) {
+		// FIXME: Can this be some sort of "emit error" func?
 		result := data.MakeResult(addr, c.depth)
 		result.Status = "Blocked by robots.txt"
 		c.results <- result

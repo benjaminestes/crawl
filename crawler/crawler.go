@@ -6,13 +6,12 @@ package crawler
 
 import (
 	"net/http"
-	"net/url"
 	"regexp"
 	"sync"
 	"time"
 
 	"github.com/benjaminestes/crawl/crawler/data"
-	"github.com/temoto/robotstxt"
+	"github.com/benjaminestes/robots"
 )
 
 type Crawler struct {
@@ -23,7 +22,7 @@ type Crawler struct {
 
 	// robots maintains a robots.txt matcher for every encountered
 	// domain
-	robots map[string]*robotstxt.RobotsData
+	robots map[string]func(string) bool
 
 	// mu guards nextqueue when multiple fetches may try to write
 	// to it simultaneously
@@ -94,7 +93,7 @@ func CrawlList(config *Config, q []*data.Address) *Crawler {
 		queue:       q,
 		Config:      config,
 		wait:        wait,
-		robots:      make(map[string]*robotstxt.RobotsData),
+		robots:      make(map[string]func(string) bool),
 		include:     preparePattern(config.Include),
 		exclude:     preparePattern(config.Exclude),
 	}
@@ -162,32 +161,31 @@ func (c *Crawler) willCrawl(fullurl string) bool {
 	return true
 }
 
-// addRobots creates a robotstxt matcher from a url string.
-// The domain and scheme are extracted from the string,
-// and used to request the appropriate file.
+// addRobots creates a robots.txt matcher from a URL string. If there
+// is a problem reading from robots.txt, treat it as a server error.
 func (c *Crawler) addRobots(fullurl string) {
-	url, err := url.Parse(fullurl)
+	rtxtURL, err := robots.Locate(fullurl)
 	if err != nil {
+		// Error parsing fullurl.
 		return
 	}
 
-	robotsPath := url.Scheme + "://" + url.Host + "/robots.txt"
-
-	// Now we've "seen" this host. If we fail to get a robots.txt
-	// file, we don't want to keep checking over and over.
-	c.robots[url.Host] = nil
-
-	resp, err := http.Get(robotsPath)
-	if err != nil || resp.StatusCode != 200 {
+	resp, err := http.Get(rtxtURL)
+	if err != nil {
+		rtxt, _ := robots.From(503, nil)
+		c.robots[rtxtURL] = rtxt.Tester(c.RobotsUserAgent)
 		return
 	}
 	defer resp.Body.Close()
 
-	robots, err := robotstxt.FromResponse(resp)
+	rtxt, err := robots.From(resp.StatusCode, resp.Body)
 	if err != nil {
+		rtxt, _ := robots.From(503, nil)
+		c.robots[rtxtURL] = rtxt.Tester(c.RobotsUserAgent)
 		return
 	}
-	c.robots[url.Host] = robots
+
+	c.robots[rtxtURL] = rtxt.Tester(c.RobotsUserAgent)
 }
 
 // Returns the next result from the crawl. Results are guaranteed to come

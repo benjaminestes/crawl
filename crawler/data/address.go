@@ -15,10 +15,6 @@ func (a *Address) String() string {
 	return a.Full
 }
 
-func (a *Address) RobotsPath() string {
-	return a.Path + "?" + a.Query
-}
-
 func (a *Address) toURL() *url.URL {
 	u, _ := url.Parse(a.Full) // FIXME: use error
 	return u
