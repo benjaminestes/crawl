@@ -17,7 +17,6 @@ import (
 	"time"
 
 	"github.com/benjaminestes/crawl/crawler"
-	"github.com/benjaminestes/crawl/crawler/schema"
 )
 
 var config = &crawler.Config{
@@ -42,7 +41,7 @@ func main() {
 	switch os.Args[1] {
 	case "schema":
 		schemaCommand.Parse(os.Args[2:])
-		doSchema()
+		fmt.Println(crawler.SchemaBigQueryJSON())
 		return
 	case "spider":
 		spiderCommand.Parse(os.Args[2:])
@@ -106,11 +105,6 @@ func doCrawl(c *crawler.Crawler) {
 	}
 
 	fmt.Fprintf(os.Stderr, "\n")
-}
-
-func doSchema() {
-	j, _ := json.MarshalIndent(schema.BQ, "", "\t")
-	fmt.Printf("%s\n", j)
 }
 
 func listFromReader(in io.Reader) []string {
