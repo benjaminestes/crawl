@@ -14,10 +14,16 @@ import (
 	"github.com/benjaminestes/robots"
 )
 
+type resolvedURL string
+
+func (u resolvedURL) String() string {
+	return string(u)
+}
+
 type Crawler struct {
 	depth   int
-	queue   []*data.Address
-	seen    map[string]bool // key = full text of URL
+	queue   []resolvedURL
+	seen    map[resolvedURL]bool
 	results chan *data.Result
 
 	// robots maintains a robots.txt matcher for every encountered
@@ -26,7 +32,7 @@ type Crawler struct {
 
 	// mu guards nextqueue when multiple fetches may try to write
 	// to it simultaneously
-	nextqueue []*data.Address
+	nextqueue []resolvedURL
 	mu        sync.Mutex
 
 	// wg waits for all spawned fetches to complete before
@@ -50,16 +56,6 @@ type Crawler struct {
 	*Config
 }
 
-// Crawl creates and starts a Crawler, and returns a pointer to it.
-// The Crawler is a state machine running in its own
-// goroutine. Therefore, calling this function may initiate many
-// network requests, even before any results are requested from it.
-func Crawl(config *Config) *Crawler {
-	// This should anticipate a failure condition
-	first := data.MakeAddressFromString(config.Start)
-	return CrawlList(config, []*data.Address{first})
-}
-
 // initializeClient uses a config object to create an http.Client
 // that conforms to the end-user's requirements.
 func initializedClient(config *Config) *http.Client {
@@ -78,19 +74,26 @@ func initializedClient(config *Config) *http.Client {
 	}
 }
 
-// CrawlList starts and returns a *Crawler that is working from an
-// input slice of Addresses rather than the start URL specified in
-// config.
-func CrawlList(config *Config, q []*data.Address) *Crawler {
+// Crawl creates and starts a Crawler, and returns a pointer to it.
+// The Crawler is a state machine running in its own
+// goroutine. Therefore, calling this function may initiate many
+// network requests, even before any results are requested from it.
+func Crawl(config *Config) *Crawler {
 	// FIXME: Should handle error
 	wait, _ := time.ParseDuration(config.WaitTime)
+
+	queue, err := config.initialQueue()
+	if err != nil {
+		// FIXME: need a way to return an error
+		return nil
+	}
 
 	c := &Crawler{
 		client:      initializedClient(config),
 		connections: make(chan bool, config.Connections),
-		seen:        make(map[string]bool),
+		seen:        make(map[resolvedURL]bool),
 		results:     make(chan *data.Result, config.Connections),
-		queue:       q,
+		queue:       queue,
 		Config:      config,
 		wait:        wait,
 		robots:      make(map[string]func(string) bool),
@@ -105,7 +108,7 @@ func CrawlList(config *Config, q []*data.Address) *Crawler {
 	// to the set of URLs that have been seen, before the crawl
 	// starts.
 	for _, addr := range c.queue {
-		c.seen[addr.Full] = true
+		c.seen[addr] = true
 	}
 
 	c.start()
@@ -135,18 +138,18 @@ func preparePattern(patterns []string) (compiled []*regexp.Regexp) {
 // willCrawl says that a string representing a URL will or will not be
 // included in a crawl based on the include and exclude fields of the
 // Crawler object.
-func (c *Crawler) willCrawl(fullurl string) bool {
+func (c *Crawler) willCrawl(fullurl resolvedURL) bool {
 	// 1. If a URL matches any exclude rule, it will not be
 	// crawled.
 	for _, r := range c.exclude {
-		if r.MatchString(fullurl) {
+		if r.MatchString(string(fullurl)) {
 			return false
 		}
 	}
 
 	// 2. If a URL matches any include rule, it will be crawled.
 	for _, r := range c.include {
-		if r.MatchString(fullurl) {
+		if r.MatchString(string(fullurl)) {
 			return true
 		}
 	}
@@ -218,17 +221,24 @@ func (c *Crawler) merge(links []*data.Link) {
 		return
 	}
 	for _, link := range links {
-		if link.Address == nil || !c.willCrawl(link.Address.Full) {
+		if link.Address == nil {
+			continue
+		}
+
+		// FIXME: Somehow avoid this cast.
+		linkURL := resolvedURL(link.Address.Full)
+
+		if !c.willCrawl(linkURL) {
 			continue
 		}
 
 		// This is the only place that c.seen is inspected or
 		// mutated after it is initialized.
 		c.mu.Lock()
-		if _, ok := c.seen[link.Address.Full]; !ok {
+		if _, ok := c.seen[linkURL]; !ok {
 			if !(link.Nofollow && c.RespectNofollow) {
-				c.seen[link.Address.Full] = true
-				c.nextqueue = append(c.nextqueue, link.Address)
+				c.seen[linkURL] = true
+				c.nextqueue = append(c.nextqueue, linkURL)
 			}
 		}
 		c.mu.Unlock()
@@ -238,10 +248,10 @@ func (c *Crawler) merge(links []*data.Link) {
 // fetch requests a URL, hydrates a result object based on its
 // contents, if any, and initiates a merge of the links discovered in
 // the process.
-func (c *Crawler) fetch(addr *data.Address) {
-	result := data.MakeResult(addr, c.depth)
+func (c *Crawler) fetch(addr resolvedURL) {
+	result := data.MakeResult(addr.String(), c.depth)
 
-	req, err := http.NewRequest("GET", addr.Full, nil)
+	req, err := http.NewRequest("GET", addr.String(), nil)
 	if err != nil {
 		return
 	}
@@ -256,16 +266,6 @@ func (c *Crawler) fetch(addr *data.Address) {
 
 	result.Hydrate(resp)
 	links := result.Links
-
-	// If the result doesn't redirect, we say it resolves to itself.
-	result.ResolvesTo = result.Address
-
-	// If redirect, the single link is the target of the
-	// redirect. We update ResolvesTo.
-	if resp.StatusCode >= 300 && resp.StatusCode < 400 {
-		result.ResolvesTo = data.MakeAddressFromRelative(addr, resp.Header.Get("Location"))
-		links = []*data.Link{data.MakeLink(addr, resp.Header.Get("Location"), "", false)}
-	}
 
 	c.merge(links)
 	c.results <- result

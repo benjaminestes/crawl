@@ -1,5 +1,7 @@
 {
-    "Start": "https://www.example.com/",
+    "Start": [
+	"https://www.example.com/"
+    ],
     "Include": [
         "^(https?://)?www\\.example\\.com/.*"
     ],

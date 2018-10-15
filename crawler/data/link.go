@@ -16,8 +16,3 @@ func MakeLink(base *Address, href string, anchor string, nofollow bool) *Link {
 	link.Address = MakeAddressFromRelative(base, href)
 	return link
 }
-
-func MakeAbsoluteLink(href string, anchor string, nofollow bool) *Link {
-	base := MakeAddressFromString(href)
-	return MakeLink(base, href, anchor, nofollow)
-}

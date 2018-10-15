@@ -42,7 +42,9 @@ type Result struct {
 	ResolvesTo *Address `json:",omitempty"` // In case of redirect
 }
 
-func MakeResult(addr *Address, depth int) *Result {
+func MakeResult(rawurl string, depth int) *Result {
+	// FIXME: Should this contructor return an error?
+	addr := MakeAddress(rawurl)
 	return &Result{
 		Address: addr,
 		Depth:   depth,
@@ -58,6 +60,17 @@ func (r *Result) Hydrate(resp *http.Response) {
 			return
 		}
 		hydrateHTMLContent(r, doc)
+	}
+
+	// If the result doesn't redirect, we say it resolves to itself.
+	r.ResolvesTo = r.Address
+
+	// If redirect, the single link is the target of the
+	// redirect. We update ResolvesTo.
+	if resp.StatusCode >= 300 && resp.StatusCode < 400 {
+		loc := resp.Header.Get("Location")
+		r.ResolvesTo = MakeAddressFromRelative(r.Address, loc)
+		r.Links = []*Link{MakeLink(r.Address, resp.Header.Get("Location"), "", false)}
 	}
 }
 

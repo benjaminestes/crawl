@@ -17,7 +17,6 @@ import (
 	"time"
 
 	"github.com/benjaminestes/crawl/crawler"
-	"github.com/benjaminestes/crawl/crawler/data"
 	"github.com/benjaminestes/crawl/crawler/schema"
 )
 
@@ -51,7 +50,7 @@ func main() {
 			log.Fatal(fmt.Errorf("expected location of config file"))
 		}
 		config := configFromFile(spiderCommand.Arg(0))
-		c = crawlSpider(config)
+		c = crawl(config)
 	case "list":
 		listCommand.Parse(os.Args[2:])
 		if listCommand.NArg() < 1 {
@@ -59,10 +58,13 @@ func main() {
 		}
 		config := configFromFile(listCommand.Arg(0))
 		queue := listFromReader(os.Stdin)
-		if *listType == "xml" {
+		// FIXME: Here to justify listType existence.
+		if *listType == "xml// " {
 			queue = listFromReader(os.Stdin)
 		}
-		c = crawlList(config, queue)
+		config.Start = queue
+		config.MaxDepth = 0
+		c = crawl(config)
 	default:
 		flag.PrintDefaults()
 		log.Fatal(fmt.Errorf("unknown command"))
@@ -111,20 +113,15 @@ func doSchema() {
 	fmt.Printf("%s\n", j)
 }
 
-func listFromReader(in io.Reader) (queue []*data.Address) {
+func listFromReader(in io.Reader) []string {
+	var queue []string
 	scanner := bufio.NewScanner(in)
 	for scanner.Scan() {
-		n := data.MakeAddressFromString(scanner.Text())
-		queue = append(queue, n)
+		queue = append(queue, scanner.Text())
 	}
-	return
+	return queue
 }
 
-func crawlSpider(config *crawler.Config) *crawler.Crawler {
+func crawl(config *crawler.Config) *crawler.Crawler {
 	return crawler.Crawl(config)
-}
-
-func crawlList(config *crawler.Config, queue []*data.Address) *crawler.Crawler {
-	config.MaxDepth = 0
-	return crawler.CrawlList(config, queue)
 }

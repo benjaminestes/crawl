@@ -20,15 +20,15 @@ func (a *Address) toURL() *url.URL {
 	return u
 }
 
-func MakeAddressFromString(addr string) *Address {
+func MakeAddress(addr string) *Address {
 	u, err := url.Parse(addr)
 	if err != nil {
 		return nil
 	}
-	return MakeAddressFromURL(u)
+	return addressFromURL(u)
 }
 
-func MakeAddressFromURL(u *url.URL) *Address {
+func addressFromURL(u *url.URL) *Address {
 	if u.Path == "" {
 		u.Path = "/"
 	}
@@ -50,7 +50,7 @@ func MakeAddressFromRelative(base *Address, addr string) *Address {
 	}
 	t := base.toURL()
 	if t != nil {
-		return MakeAddressFromURL(t.ResolveReference(u))
+		return addressFromURL(t.ResolveReference(u))
 	}
 	return nil
 }

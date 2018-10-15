@@ -45,7 +45,7 @@ func crawlWait(c *Crawler) crawlfn {
 // the URL is in the scope of the crawl as defined by the end user.
 func crawlCheckRobots(c *Crawler) crawlfn {
 	addr := c.queue[0]
-	rtxtURL, err := robots.Locate(addr.Full)
+	rtxtURL, err := robots.Locate(addr.String())
 	if err != nil {
 		// Couldn't parse URL. Is this the desired behavior?
 		return crawlNext
@@ -53,9 +53,9 @@ func crawlCheckRobots(c *Crawler) crawlfn {
 	if _, ok := c.robots[rtxtURL]; !ok {
 		c.addRobots(rtxtURL)
 	}
-	if !c.robots[rtxtURL](addr.Full) {
+	if !c.robots[rtxtURL](addr.String()) {
 		// FIXME: Can this be some sort of "emit error" func?
-		result := data.MakeResult(addr, c.depth)
+		result := data.MakeResult(addr.String(), c.depth)
 		result.Status = "Blocked by robots.txt"
 		c.results <- result
 		return crawlNext
@@ -92,7 +92,6 @@ func crawlDo(c *Crawler) crawlfn {
 // more URLs in the current queue, we wait for all currently active
 // fetches to complete.
 func crawlNext(c *Crawler) crawlfn {
-	c.queue[0] = nil // Release (strong) reference to address
 	c.queue = c.queue[1:]
 	if len(c.queue) > 0 {
 		return crawlStart
