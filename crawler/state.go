@@ -68,7 +68,6 @@ func crawlCheckRobots(c *Crawler) crawlfn {
 // actually crawl the URL, and initiate fetching.
 func crawlDo(c *Crawler) crawlfn {
 	addr := c.queue[0]
-
 	// This blocks when there are = c.Connections fetches active.
 	// Otherwise, it secures a token.
 	c.connections <- true
@@ -77,14 +76,12 @@ func crawlDo(c *Crawler) crawlfn {
 	go func() {
 		defer c.wg.Done()
 		defer func() { <-c.connections }() // Release token
-
 		// This fetch triggers the crawling of a URL and
 		// ultimately the extraction of the links on the
 		// crawled page. Merging of newly discovered URLs
 		// happens as part of this call.
 		c.fetch(addr)
 	}()
-
 	return crawlNext
 }
 

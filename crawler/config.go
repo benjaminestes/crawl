@@ -21,6 +21,9 @@ func (conf *Config) initialQueue() ([]resolvedURL, error) {
 		if err != nil {
 			return nil, err
 		}
+		if u.Path == "" {
+			u.Path = "/"
+		}
 		result = append(result, resolvedURL(u.String()))
 	}
 	return result, nil

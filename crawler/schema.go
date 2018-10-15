@@ -6,7 +6,7 @@ import (
 	"github.com/benjaminestes/crawl/crawler/schema"
 )
 
-func SchemaBigQueryJSON() []byte {
+func Schema() []byte {
 	// FIXME: Check error
 	j, _ := json.MarshalIndent(schema.BQ, "", "\t")
 	return j

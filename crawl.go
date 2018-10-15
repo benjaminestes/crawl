@@ -41,7 +41,7 @@ func main() {
 	switch os.Args[1] {
 	case "schema":
 		schemaCommand.Parse(os.Args[2:])
-		fmt.Println(crawler.SchemaBigQueryJSON())
+		fmt.Println(crawler.Schema())
 		return
 	case "spider":
 		spiderCommand.Parse(os.Args[2:])
