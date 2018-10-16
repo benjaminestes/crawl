@@ -10,7 +10,6 @@ import (
 	"flag"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"log"
 	"os"
 	"strings"
@@ -18,12 +17,6 @@ import (
 
 	"github.com/benjaminestes/crawl/crawler"
 )
-
-var config = &crawler.Config{
-	RobotsUserAgent: "Crawler",
-	WaitTime:        "100ms",
-	MaxDepth:        -1,
-}
 
 func main() {
 	schemaCommand := flag.NewFlagSet("schema", flag.ExitOnError)
@@ -73,18 +66,17 @@ func main() {
 }
 
 func configFromFile(name string) *crawler.Config {
-	config := &crawler.Config{}
-
-	configJSON, err := ioutil.ReadFile(name)
+	f, err := os.Open(name)
 	if err != nil {
 		log.Fatal(err)
 	}
 
-	err = json.Unmarshal(configJSON, config)
+	config, err := crawler.ConfigFromJSON(f)
 	if err != nil {
 		log.Fatal(err)
 	}
 
+	// FIXME: Handle error!
 	return config
 }
 
