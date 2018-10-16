@@ -1,0 +1,20 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<title>{{.ID}}</title>
+<meta name="description" content="My description." />
+<meta name="robots" content="index, follow" />
+<link rel="canonical" href="http://www.example.com/{{.ID}}" />
+<link rel="alternate" href="/{{.ID}}" hreflang="en-us" />
+<link rel="alternate" href="/{{.ID}}" hreflang="en" />
+<link rel="alternate" href="/{{.ID}}" hreflang="x-default" />
+</head>
+<body>
+  <h1>{{.Children}}</h1>
+  <p>Some very interesting body test.</p>
+  <h1>Here are the links</h1>
+  {{range $e := .Children}}
+  <a href="/{{$.ID}}{{$e}}" rel="{{if (odd $e)}}nofollow{{end}}">Child {{$e}}</a>
+  {{end}}
+</body>
+</html>
