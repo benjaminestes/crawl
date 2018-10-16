@@ -2,6 +2,9 @@ package data
 
 import "net/url"
 
+// Address represents the useful parts of a URL we'd like to have
+// available for analysis. It is the basic type which other
+// address-related types embed.
 type Address struct {
 	Full   string
 	Scheme string
@@ -11,17 +14,8 @@ type Address struct {
 	Query  string
 }
 
-func (a *Address) String() string {
-	return a.Full
-}
-
-func (a *Address) toURL() *url.URL {
-	u, _ := url.Parse(a.Full) // FIXME: use error
-	return u
-}
-
-func MakeAddress(addr string) *Address {
-	u, err := url.Parse(addr)
+func MakeAddress(rawurl string) *Address {
+	u, err := url.Parse(rawurl)
 	if err != nil {
 		return nil
 	}
@@ -43,12 +37,15 @@ func addressFromURL(u *url.URL) *Address {
 	}
 }
 
-func MakeAddressFromRelative(base *Address, addr string) *Address {
-	u, err := url.Parse(addr)
+func MakeAddressResolved(base *Address, rawurl string) *Address {
+	u, err := url.Parse(rawurl)
 	if err != nil {
 		return nil
 	}
-	t := base.toURL()
+	t, err := url.Parse(base.Full)
+	if err != nil {
+		return nil
+	}
 	if t != nil {
 		return addressFromURL(t.ResolveReference(u))
 	}

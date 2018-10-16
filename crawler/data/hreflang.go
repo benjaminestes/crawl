@@ -10,7 +10,7 @@ func MakeHreflang(base *Address, href, lang string) *Hreflang {
 	hreflang := &Hreflang{
 		Href:     href,
 		Hreflang: lang,
+		Address:  MakeAddressResolved(base, href),
 	}
-	hreflang.Address = MakeAddressFromRelative(base, href)
 	return hreflang
 }

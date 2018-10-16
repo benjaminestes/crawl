@@ -12,7 +12,7 @@ func MakeLink(base *Address, href string, anchor string, nofollow bool) *Link {
 		Href:     href,
 		Anchor:   anchor,
 		Nofollow: nofollow,
+		Address:  MakeAddressResolved(base, href),
 	}
-	link.Address = MakeAddressFromRelative(base, href)
 	return link
 }

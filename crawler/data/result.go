@@ -69,7 +69,7 @@ func (r *Result) Hydrate(resp *http.Response) {
 	// redirect. We update ResolvesTo.
 	if resp.StatusCode >= 300 && resp.StatusCode < 400 {
 		loc := resp.Header.Get("Location")
-		r.ResolvesTo = MakeAddressFromRelative(r.Address, loc)
+		r.ResolvesTo = MakeAddressResolved(r.Address, loc)
 		r.Links = []*Link{MakeLink(r.Address, resp.Header.Get("Location"), "", false)}
 	}
 }

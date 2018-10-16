@@ -6,8 +6,9 @@ type Canonical struct {
 }
 
 func MakeCanonical(base *Address, href string) *Canonical {
-	c := new(Canonical)
-	c.Href = href
-	c.Address = MakeAddressFromRelative(base, href)
+	c := &Canonical{
+		Href:    href,
+		Address: MakeAddressResolved(base, href),
+	}
 	return c
 }
