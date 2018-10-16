@@ -4,7 +4,7 @@
 
 package schema
 
-var BQ = []SchemaItem{
+var bq = []SchemaItem{
 	{
 		Name: "Address",
 		Type: "RECORD",

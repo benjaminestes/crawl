@@ -16,6 +16,7 @@ import (
 	"time"
 
 	"github.com/benjaminestes/crawl/crawler"
+	"github.com/benjaminestes/crawl/schema"
 )
 
 func main() {
@@ -34,29 +35,41 @@ func main() {
 	switch os.Args[1] {
 	case "schema":
 		schemaCommand.Parse(os.Args[2:])
-		fmt.Println(crawler.Schema())
+		fmt.Println(schema.BigQueryJSON())
 		return
 	case "spider":
 		spiderCommand.Parse(os.Args[2:])
 		if spiderCommand.NArg() < 1 {
 			log.Fatal(fmt.Errorf("expected location of config file"))
 		}
-		config := configFromFile(spiderCommand.Arg(0))
-		c = crawl(config)
+		config, err := os.Open(spiderCommand.Arg(0))
+		if err != nil {
+			log.Fatal(fmt.Errorf("%v", err))
+		}
+		c, err = crawler.FromJSON(config)
+		if err != nil {
+			log.Fatal(fmt.Errorf("%v", err))
+		}
 	case "list":
 		listCommand.Parse(os.Args[2:])
 		if listCommand.NArg() < 1 {
 			log.Fatal(fmt.Errorf("expected location of config file"))
 		}
-		config := configFromFile(listCommand.Arg(0))
+		config, err := os.Open(listCommand.Arg(0))
+		if err != nil {
+			log.Fatal(fmt.Errorf("%v", err))
+		}
 		queue := listFromReader(os.Stdin)
 		// FIXME: Here to justify listType existence.
-		if *listType == "xml// " {
+		if *listType == "xml" {
 			queue = listFromReader(os.Stdin)
 		}
-		config.Start = queue
-		config.MaxDepth = 0
-		c = crawl(config)
+		c, err := crawler.FromJSON(config)
+		if err != nil {
+			log.Fatal(fmt.Errorf("%v", err))
+		}
+		c.From = queue
+		c.MaxDepth = 0
 	default:
 		flag.PrintDefaults()
 		log.Fatal(fmt.Errorf("unknown command"))
@@ -65,22 +78,12 @@ func main() {
 	doCrawl(c)
 }
 
-func configFromFile(name string) *crawler.Config {
-	f, err := os.Open(name)
-	if err != nil {
-		log.Fatal(err)
-	}
-
-	config, err := crawler.ConfigFromJSON(f)
-	if err != nil {
-		log.Fatal(err)
-	}
-
-	// FIXME: Handle error!
-	return config
-}
-
 func doCrawl(c *crawler.Crawler) {
+	err := c.Start()
+	if err != nil {
+		// FIXME: need a way to signal error
+		panic("couldn't start crawler")
+	}
 	count := 0
 	start := time.Now()
 	for n := c.Next(); n != nil; n = c.Next() {
@@ -106,8 +109,4 @@ func listFromReader(in io.Reader) []string {
 		queue = append(queue, scanner.Text())
 	}
 	return queue
-}
-
-func crawl(config *crawler.Config) *crawler.Crawler {
-	return crawler.Crawl(config)
 }

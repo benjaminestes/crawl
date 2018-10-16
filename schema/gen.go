@@ -22,7 +22,7 @@ import (
 	"os"
 	"reflect"
 
-	"github.com/benjaminestes/crawl/src/crawler/data"
+	"github.com/benjaminestes/crawl/crawler/data"
 )
 
 type SchemaItem struct {
@@ -55,7 +55,7 @@ func main() {
 	r := &data.Result{}
 	t := reflect.TypeOf(*r)
 
-	fmt.Fprintln(&buf, "var BQ = []SchemaItem{")
+	fmt.Fprintln(&buf, "var bq = []SchemaItem{")
 	recursiveGenerate(t, &buf)
 	fmt.Fprintln(&buf, "}")
 	genFile("schema.go", &buf)

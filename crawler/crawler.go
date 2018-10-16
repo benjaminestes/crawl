@@ -6,6 +6,7 @@ package crawler
 
 import (
 	"net/http"
+	"net/url"
 	"regexp"
 	"sync"
 	"time"
@@ -20,7 +21,35 @@ func (u resolvedURL) String() string {
 	return string(u)
 }
 
+func (c *Crawler) initialQueue() ([]resolvedURL, error) {
+	var result []resolvedURL
+	for _, s := range c.From {
+		u, err := url.Parse(s)
+		if err != nil {
+			return nil, err
+		}
+		// Per RFC 1945, a request without a path part must
+		// send a "/".
+		if u.Path == "" {
+			u.Path = "/"
+		}
+		result = append(result, resolvedURL(u.String()))
+	}
+	return result, nil
+}
+
 type Crawler struct {
+	// Exported configuration fields.
+	Connections     int
+	UserAgent       string
+	RobotsUserAgent string
+	Include         []string
+	Exclude         []string
+	From            []string
+	RespectNofollow bool
+	MaxDepth        int
+	WaitTime        string
+
 	depth   int
 	queue   []resolvedURL
 	seen    map[resolvedURL]bool
@@ -53,12 +82,11 @@ type Crawler struct {
 	exclude []*regexp.Regexp
 
 	client *http.Client
-	*Config
 }
 
 // initializeClient uses a config object to create an http.Client
 // that conforms to the end-user's requirements.
-func initializedClient(config *Config) *http.Client {
+func initializedClient(c *Crawler) *http.Client {
 	return &http.Client{
 		// Because we're checking the behavior of specific
 		// URLs to understand whether they behave as expected,
@@ -67,7 +95,7 @@ func initializedClient(config *Config) *http.Client {
 			return http.ErrUseLastResponse
 		},
 		Transport: &http.Transport{
-			MaxIdleConns: config.Connections,
+			MaxIdleConns: c.Connections,
 			// FIXME: make configurable
 			IdleConnTimeout: 30 * time.Second,
 		},
@@ -78,28 +106,37 @@ func initializedClient(config *Config) *http.Client {
 // The Crawler is a state machine running in its own
 // goroutine. Therefore, calling this function may initiate many
 // network requests, even before any results are requested from it.
-func Crawl(config *Config) *Crawler {
-	// FIXME: Should handle error
-	wait, _ := time.ParseDuration(config.WaitTime)
+//
+// If Start returns a non-nil error, calls to Next will fail.
+func (c *Crawler) Start() error {
+	waitString := "1ms"
+	if c.WaitTime != "" {
+		waitString = c.WaitTime
+	}
 
-	queue, err := config.initialQueue()
+	wait, err := time.ParseDuration(waitString)
 	if err != nil {
-		// FIXME: need a way to return an error
-		return nil
+		return err
 	}
 
-	c := &Crawler{
-		client:      initializedClient(config),
-		connections: make(chan bool, config.Connections),
-		seen:        make(map[resolvedURL]bool),
-		results:     make(chan *data.Result, config.Connections),
-		queue:       queue,
-		Config:      config,
-		wait:        wait,
-		robots:      make(map[string]func(string) bool),
-		include:     preparePattern(config.Include),
-		exclude:     preparePattern(config.Exclude),
+	queue, err := c.initialQueue()
+	if err != nil {
+		return err
 	}
+
+	conns := c.Connections
+	if conns < 1 {
+		conns = 1
+	}
+
+	c.client = initializedClient(c)
+	c.connections = make(chan bool, conns)
+	c.exclude = preparePattern(c.Exclude)
+	c.include = preparePattern(c.Include)
+	c.queue = queue
+	c.robots = make(map[string]func(string) bool)
+	c.seen = make(map[resolvedURL]bool)
+	c.wait = wait
 
 	// If a URL has not been seen when the crawler processes a
 	// link, that URL will be added to the next queue to crawl. It
@@ -111,24 +148,21 @@ func Crawl(config *Config) *Crawler {
 		c.seen[addr] = true
 	}
 
-	c.start()
-
-	return c
-}
-
-// start begins the state machine for the crawler in its own goroutine
-// and returns control to the calling function.
-func (c *Crawler) start() {
+	c.results = make(chan *data.Result, conns)
 	go func() {
 		for f := crawlStartQueue; f != nil; f = f(c) {
 		}
 		close(c.results)
 	}()
+
+	return nil
 }
 
 // preparePattern takes a []string of regexp patterns and compiles them.
 func preparePattern(patterns []string) (compiled []*regexp.Regexp) {
 	for _, s := range patterns {
+		// FIXME: patterns are user input. This shouldn't use
+		// MustCompile.
 		r := regexp.MustCompile(s)
 		compiled = append(compiled, r)
 	}

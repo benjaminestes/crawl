@@ -19,12 +19,18 @@ func TestTest(t *testing.T) {
 	ts := httptest.NewServer(mux)
 	defer ts.Close()
 
-	c := Crawl(&Config{
-		Start:           []string{ts.URL},
+	c := &Crawler{
+		From:            []string{ts.URL},
 		MaxDepth:        10,
 		RobotsUserAgent: "Crawler",
 		Connections:     2,
-	})
+		WaitTime:        "100ms",
+	}
+
+	err := c.Start()
+	if err != nil {
+		t.Errorf("%v", err)
+	}
 
 	c.Next()
 }
@@ -82,13 +88,19 @@ func TestTestTwo(t *testing.T) {
 	ts := httptest.NewServer(mux)
 	defer ts.Close()
 
-	c := Crawl(&Config{
-		Start:           []string{ts.URL},
+	c := &Crawler{
+		From:            []string{ts.URL},
 		MaxDepth:        3,
 		RobotsUserAgent: "Crawler",
 		Connections:     20,
 		RespectNofollow: true,
-	})
+		WaitTime:        "1ms",
+	}
+
+	err := c.Start()
+	if err != nil {
+		t.Errorf("%v", err)
+	}
 
 	var count int
 	for n := c.Next(); n != nil; n = c.Next() {
