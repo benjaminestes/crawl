@@ -38,7 +38,7 @@ func GetNodesByTagName(name string, node *html.Node) []*html.Node {
 }
 
 func GetNodesByName(name string, node *html.Node) (list []*html.Node) {
-	if MatchAttribute("name", name, node) {
+	if matchAttribute("name", name, node) {
 		list = append(list, node)
 	}
 	for next := node.FirstChild; next != nil; next = next.NextSibling {
@@ -48,7 +48,7 @@ func GetNodesByName(name string, node *html.Node) (list []*html.Node) {
 }
 
 func GetNodeByID(id string, node *html.Node) *html.Node {
-	if MatchAttribute("id", id, node) {
+	if matchAttribute("id", id, node) {
 		return node
 	}
 	for next := node.FirstChild; next != nil; next = next.NextSibling {
@@ -60,7 +60,7 @@ func GetNodeByID(id string, node *html.Node) *html.Node {
 }
 
 func GetNodesByClassName(name string, node *html.Node) (list []*html.Node) {
-	if MatchClass(name, node) {
+	if matchClass(name, node) {
 		list = append(list, node)
 	}
 	for next := node.FirstChild; next != nil; next = next.NextSibling {
@@ -69,7 +69,7 @@ func GetNodesByClassName(name string, node *html.Node) (list []*html.Node) {
 	return list
 }
 
-func MatchAttribute(k, v string, n *html.Node) bool {
+func matchAttribute(k, v string, n *html.Node) bool {
 	if n.Type != html.ElementNode {
 		return false
 	}
@@ -81,9 +81,9 @@ func MatchAttribute(k, v string, n *html.Node) bool {
 	return false
 }
 
-func MatchAttributes(attrs map[string]string, n *html.Node) bool {
+func matchAttributes(attrs map[string]string, n *html.Node) bool {
 	for k, v := range attrs {
-		if !MatchAttribute(k, v, n) {
+		if !matchAttribute(k, v, n) {
 			return false
 		}
 	}
@@ -92,7 +92,7 @@ func MatchAttributes(attrs map[string]string, n *html.Node) bool {
 
 func FilterByAttribute(k, v string, nodes []*html.Node) (filtered []*html.Node) {
 	for _, n := range nodes {
-		if MatchAttribute(k, v, n) {
+		if matchAttribute(k, v, n) {
 			filtered = append(filtered, n)
 		}
 	}
@@ -120,7 +120,7 @@ func GetAttribute(k string, n *html.Node) (v string) {
 	return
 }
 
-func MatchClass(class string, n *html.Node) bool {
+func matchClass(class string, n *html.Node) bool {
 	for _, c := range GetClasses(n) {
 		if c == class {
 			return true
@@ -133,14 +133,13 @@ func GetClasses(node *html.Node) []string {
 	return strings.Fields(GetAttribute("class", node))
 }
 
-// does this work?
-func GetText(n *html.Node) string {
+func TextContent(n *html.Node) string {
 	var b strings.Builder
 	var getTextHelp func(node *html.Node)
 	getTextHelp = func(node *html.Node) {
 		switch {
 		case node == nil:
-			// do nothing
+			// Do nothing.
 		case node.Type == html.TextNode:
 			b.WriteString(node.Data)
 		default:

@@ -86,8 +86,8 @@ func hydrateHeader(r *Result, resp *http.Response) {
 }
 
 func hydrateHTMLContent(r *Result, doc *html.Node) {
-	r.Title = scrape.GetText(scrape.QueryNode("title", nil, doc))
-	r.H1 = scrape.GetText(scrape.QueryNode("h1", nil, doc))
+	r.Title = scrape.TextContent(scrape.QueryNode("title", nil, doc))
+	r.H1 = scrape.TextContent(scrape.QueryNode("h1", nil, doc))
 	r.Description = scrape.GetAttribute(
 		"content",
 		scrape.QueryNode(
@@ -109,7 +109,7 @@ func hydrateHTMLContent(r *Result, doc *html.Node) {
 	r.Hreflang = getHreflang(r.Address, doc)
 	r.Links = getLinks(r.Address, doc)
 
-	sum := sha512.Sum512([]byte(scrape.GetText(scrape.QueryNode("body", nil, doc))))
+	sum := sha512.Sum512([]byte(scrape.TextContent(scrape.QueryNode("body", nil, doc))))
 	r.BodyTextHash = base64.StdEncoding.EncodeToString(sum[:])
 }
 
@@ -144,7 +144,7 @@ func getLinks(base *Address, n *html.Node) (links []*Link) {
 		link := MakeLink(
 			base,
 			href,
-			scrape.GetText(a),
+			scrape.TextContent(a),
 			scrape.GetAttribute("rel", a) == "nofollow", // FIXME: Trim whitespace?
 		)
 		links = append(links, link)
