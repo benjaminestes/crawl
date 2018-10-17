@@ -4,12 +4,12 @@
 
 package schema
 
-var bq = []SchemaItem{
+var bq = []schemaItem{
 	{
 		Name: "Address",
 		Type: "RECORD",
 		Mode: "NULLABLE",
-		Fields: []SchemaItem{
+		Fields: []schemaItem{
 			{
 				Name: "Full",
 				Type: "STRING",
@@ -76,12 +76,12 @@ var bq = []SchemaItem{
 		Name: "Canonical",
 		Type: "RECORD",
 		Mode: "NULLABLE",
-		Fields: []SchemaItem{
+		Fields: []schemaItem{
 			{
 				Name: "Address",
 				Type: "RECORD",
 				Mode: "NULLABLE",
-				Fields: []SchemaItem{
+				Fields: []schemaItem{
 					{
 						Name: "Full",
 						Type: "STRING",
@@ -125,12 +125,12 @@ var bq = []SchemaItem{
 		Name: "Links",
 		Type: "RECORD",
 		Mode: "REPEATED",
-		Fields: []SchemaItem{
+		Fields: []schemaItem{
 			{
 				Name: "Address",
 				Type: "RECORD",
 				Mode: "NULLABLE",
-				Fields: []SchemaItem{
+				Fields: []schemaItem{
 					{
 						Name: "Full",
 						Type: "STRING",
@@ -184,12 +184,12 @@ var bq = []SchemaItem{
 		Name: "Hreflang",
 		Type: "RECORD",
 		Mode: "REPEATED",
-		Fields: []SchemaItem{
+		Fields: []schemaItem{
 			{
 				Name: "Address",
 				Type: "RECORD",
 				Mode: "NULLABLE",
-				Fields: []SchemaItem{
+				Fields: []schemaItem{
 					{
 						Name: "Full",
 						Type: "STRING",
@@ -263,7 +263,7 @@ var bq = []SchemaItem{
 		Name: "Header",
 		Type: "RECORD",
 		Mode: "REPEATED",
-		Fields: []SchemaItem{
+		Fields: []schemaItem{
 			{
 				Name: "K",
 				Type: "STRING",
@@ -280,7 +280,7 @@ var bq = []SchemaItem{
 		Name: "ResolvesTo",
 		Type: "RECORD",
 		Mode: "NULLABLE",
-		Fields: []SchemaItem{
+		Fields: []schemaItem{
 			{
 				Name: "Full",
 				Type: "STRING",

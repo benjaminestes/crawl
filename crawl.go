@@ -40,7 +40,8 @@ func main() {
 	switch os.Args[1] {
 	case "schema":
 		schemaCommand.Parse(os.Args[2:])
-		fmt.Println(schema.BigQueryJSON())
+		os.Stdout.Write(schema.BigQueryJSON())
+		fmt.Println()
 		return
 	case "spider":
 		spiderCommand.Parse(os.Args[2:])
@@ -57,9 +58,27 @@ func main() {
 		}
 	case "sitemap":
 		sitemapCommand.Parse(os.Args[2:])
-		if listCommand.NArg() < 1 {
+		if sitemapCommand.NArg() < 1 {
 			log.Fatal(fmt.Errorf("expected location of config file"))
 		}
+		config, err := os.Open(sitemapCommand.Arg(0))
+		if err != nil {
+			log.Fatalf("%v", err)
+		}
+		if sitemapCommand.NArg() < 2 {
+			log.Fatal(fmt.Errorf("expected sitemap URL"))
+		}
+		var queue []string
+		queue, err = FetchAll(sitemapCommand.Arg(1))
+		if err != nil {
+			log.Fatal(fmt.Errorf("error fetching sitemap"))
+		}
+		c, err = crawler.FromJSON(config)
+		if err != nil {
+			log.Fatalf("couldn't parse JSON config: %v", err)
+		}
+		c.From = queue
+		c.MaxDepth = 0
 		//		queue, _ := FetchAll(sitemapCommand.Arg(1))
 		//		queue
 	case "list":
@@ -104,6 +123,7 @@ func doCrawl(c *crawler.Crawler) {
 		// FIXME: need a way to signal error
 		panic("couldn't start crawler")
 	}
+	log.Printf("crawl started")
 	for n := c.Next(); n != nil; n = c.Next() {
 		j, _ := json.Marshal(n)
 		fmt.Printf("%s\n", j)
@@ -112,7 +132,7 @@ func doCrawl(c *crawler.Crawler) {
 			lastUpdate = time.Now()
 			rate := (count - lastCount) / 5
 			lastCount = count
-			log.Printf("crawling %d so far (~%d/sec)", count, rate)
+			log.Printf("crawled %d (~%d/sec)", count, rate)
 		}
 	}
 

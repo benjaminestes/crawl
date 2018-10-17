@@ -25,12 +25,13 @@ import (
 	"github.com/benjaminestes/crawl/crawler/data"
 )
 
-type SchemaItem struct {
+// Does this have to be re-defined here?
+type schemaItem struct {
 	Description string
 	Mode        string
 	Name        string
 	Type        string
-	Fields      []SchemaItem
+	Fields      []schemaItem
 }
 
 func genFile(name string, buf *bytes.Buffer) {
@@ -55,7 +56,7 @@ func main() {
 	r := &data.Result{}
 	t := reflect.TypeOf(*r)
 
-	fmt.Fprintln(&buf, "var bq = []SchemaItem{")
+	fmt.Fprintln(&buf, "var bq = []schemaItem{")
 	recursiveGenerate(t, &buf)
 	fmt.Fprintln(&buf, "}")
 	genFile("schema.go", &buf)
@@ -64,7 +65,7 @@ func main() {
 func recursiveGenerate(t reflect.Type, buf *bytes.Buffer) {
 	for i := 0; i < t.NumField(); i++ {
 		g := t.Field(i)
-		s := &SchemaItem{}
+		s := &schemaItem{}
 		s.Name = g.Name
 		s.Type = typeToString(g.Type)
 
@@ -78,11 +79,11 @@ func recursiveGenerate(t reflect.Type, buf *bytes.Buffer) {
 
 		switch g.Type.Kind() {
 		case reflect.Ptr:
-			fmt.Fprintln(buf, "Fields: []SchemaItem{")
+			fmt.Fprintln(buf, "Fields: []schemaItem{")
 			recursiveGenerate(g.Type.Elem(), buf)
 			fmt.Fprintln(buf, "},")
 		case reflect.Slice:
-			fmt.Fprintln(buf, "Fields: []SchemaItem{")
+			fmt.Fprintln(buf, "Fields: []schemaItem{")
 			recursiveGenerate(g.Type.Elem().Elem(), buf)
 			fmt.Fprintln(buf, "},")
 		}

@@ -1,9 +1,9 @@
 package schema
 
-type SchemaItem struct {
+type schemaItem struct {
 	Description string       `json:"description,omitempty"`
 	Mode        string       `json:"mode"`
 	Name        string       `json:"name"`
 	Type        string       `json:"type"`
-	Fields      []SchemaItem `json:"fields,omitempty"`
+	Fields      []schemaItem `json:"fields,omitempty"`
 }
