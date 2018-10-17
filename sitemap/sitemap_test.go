@@ -54,3 +54,19 @@ func TestFetchIndex(t *testing.T) {
 		t.Errorf("expected 2 URLs, got %d", len(urls))
 	}
 }
+
+func TestInvalidData(t *testing.T) {
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		fmt.Fprintf(w, "This is not a sitemap(index)?!")
+	}))
+
+	_, err := Fetch(ts.URL)
+	if err == nil {
+		t.Errorf("Fetch should've reported an error")
+	}
+
+	_, err = FetchIndex(ts.URL)
+	if err == nil {
+		t.Errorf("FetchIndex should've reported an error")
+	}
+}
