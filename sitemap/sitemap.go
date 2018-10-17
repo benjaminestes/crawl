@@ -37,10 +37,10 @@ func loadURL(url string) ([]byte, error) {
 	return data, nil
 }
 
-func tryDecodeSitemap(data []byte) ([]string, error) {
+func Parse(in io.Reader) ([]string, error) {
 	res := &urlset{}
 
-	err := xml.Unmarshal(data, res)
+	err := xml.Unmarshal(in, res)
 	if err != nil {
 		return nil, err
 	}
@@ -53,16 +53,10 @@ func tryDecodeSitemap(data []byte) ([]string, error) {
 	return urls, nil
 }
 
-func urlsetToList() {}
-
-func indexToList() {}
-
-func recurseIndex() {}
-
-func tryDecodeIndex(data []byte) ([]string, error) {
+func ParseIndex(in io.Reader) ([]string, error) {
 	res := &index{}
 
-	err := xml.Unmarshal(data, res)
+	err := xml.Unmarshal(in, res)
 	if err != nil {
 		return nil, err
 	}
@@ -72,18 +66,24 @@ func tryDecodeIndex(data []byte) ([]string, error) {
 		sitemaps = append(sitemaps, s.Loc)
 	}
 
-	var urls []string
-	for _, s := range sitemaps {
-		newurls, err := FromURL(s)
-		if err != nil {
-			return nil, err
-		}
-		urls = append(urls, newurls...)
-	}
-	return urls, nil
+	// var urls []string
+	// for _, s := range sitemaps {
+	// 	newurls, err := FromURL(s)
+	// 	if err != nil {
+	// 		return nil, err
+	// 	}
+	// 	urls = append(urls, newurls...)
+	//}
+	// return urls, nil
 }
 
-func FromURL(url string) ([]string, error) {
+func Fetch(url string) ([]string, error) {
+}
+
+func FetchIndex(url string) ([]string, error) {
+}
+
+func FetchAll(url string) ([]string, error) {
 	data, err := loadURL(url)
 	if err != nil {
 		return nil, err
@@ -91,7 +91,7 @@ func FromURL(url string) ([]string, error) {
 
 	var urls []string
 
-	urls, err = tryDecodeSitemap(data)
+	urls, err = Parse(data)
 	if err != nil {
 		return nil, err
 	}
@@ -100,10 +100,17 @@ func FromURL(url string) ([]string, error) {
 		return urls, nil
 	}
 
-	urls, err = tryDecodeIndex(data)
+	sitemaps, err = ParseIndex(data)
 	if err != nil {
 		return nil, err
 	}
+
+	for _, s := range sitemaps {
+		newurls, err := FetchAll(s)
+		if err != nil {
+			return nil, err
+		}
+		urls = append(urls, 
 
 	return urls, nil
 }
