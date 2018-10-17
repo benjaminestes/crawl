@@ -9,7 +9,7 @@ import (
 
 func QueryNodes(name string, attrs map[string]string, n *html.Node) (list []*html.Node) {
 	list = GetNodesByTagName(name, n)
-	list = FilterByAttributes(attrs, list)
+	list = filterByAttributes(attrs, list)
 	return
 }
 
@@ -90,7 +90,7 @@ func matchAttributes(attrs map[string]string, n *html.Node) bool {
 	return true
 }
 
-func FilterByAttribute(k, v string, nodes []*html.Node) (filtered []*html.Node) {
+func filterByAttribute(k, v string, nodes []*html.Node) (filtered []*html.Node) {
 	for _, n := range nodes {
 		if matchAttribute(k, v, n) {
 			filtered = append(filtered, n)
@@ -99,10 +99,10 @@ func FilterByAttribute(k, v string, nodes []*html.Node) (filtered []*html.Node) 
 	return
 }
 
-func FilterByAttributes(attrs map[string]string, nodes []*html.Node) (filtered []*html.Node) {
+func filterByAttributes(attrs map[string]string, nodes []*html.Node) (filtered []*html.Node) {
 	filtered = nodes
 	for k, v := range attrs {
-		filtered = FilterByAttribute(k, v, filtered)
+		filtered = filterByAttribute(k, v, filtered)
 	}
 	return
 }
