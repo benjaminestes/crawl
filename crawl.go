@@ -15,7 +15,6 @@ import (
 	"log"
 	"net/http"
 	"os"
-	"strings"
 	"time"
 
 	"github.com/benjaminestes/crawl/crawler"
@@ -27,7 +26,9 @@ func main() {
 	schemaCommand := flag.NewFlagSet("schema", flag.ExitOnError)
 	spiderCommand := flag.NewFlagSet("spider", flag.ExitOnError)
 	listCommand := flag.NewFlagSet("list", flag.ExitOnError)
-	listType := listCommand.String("format", "text", "format of input for list mode: {text|xml}")
+	listType := listCommand.String("format",
+		"text", "format of input for list mode: {text|xml}")
+	sitemapCommand := flag.NewFlagSet("sitemap", flag.ExitOnError)
 
 	if len(os.Args) < 2 {
 		log.Fatal(fmt.Errorf("expected command"))
@@ -54,6 +55,13 @@ func main() {
 		if err != nil {
 			log.Fatal(fmt.Errorf("%v", err))
 		}
+	case "sitemap":
+		sitemapCommand.Parse(os.Args[2:])
+		if listCommand.NArg() < 1 {
+			log.Fatal(fmt.Errorf("expected location of config file"))
+		}
+		//		queue, _ := FetchAll(sitemapCommand.Arg(1))
+		//		queue
 	case "list":
 		listCommand.Parse(os.Args[2:])
 		if listCommand.NArg() < 1 {
@@ -63,12 +71,18 @@ func main() {
 		if err != nil {
 			log.Fatal(fmt.Errorf("%v", err))
 		}
-		queue := listFromReader(os.Stdin)
-		// FIXME: Here to justify listType existence.
-		if *listType == "xml" {
+		var queue []string
+		switch *listType {
+		case "text":
 			queue = listFromReader(os.Stdin)
+		// FIXME: Here to justify listType existence.
+		case "xml":
+			queue, err = sitemap.Parse(os.Stdin)
+			if err != nil {
+				log.Fatalf("couldn't parse sitemap from stdin: %v", err)
+			}
 		}
-		c, err := crawler.FromJSON(config)
+		c, err = crawler.FromJSON(config)
 		if err != nil {
 			log.Fatal(fmt.Errorf("%v", err))
 		}
@@ -83,27 +97,26 @@ func main() {
 }
 
 func doCrawl(c *crawler.Crawler) {
+	count, lastCount := 0, 0
+	lastUpdate := time.Now()
 	err := c.Start()
 	if err != nil {
 		// FIXME: need a way to signal error
 		panic("couldn't start crawler")
 	}
-	count := 0
-	start := time.Now()
 	for n := c.Next(); n != nil; n = c.Next() {
 		j, _ := json.Marshal(n)
 		fmt.Printf("%s\n", j)
 		count++
-		fmt.Fprintf(os.Stderr, "\r%s", strings.Repeat(" ", 65))
-		fmt.Fprintf(
-			os.Stderr,
-			"\r%s : %d crawled",
-			time.Since(start).Round(time.Second),
-			count,
-		)
+		if time.Since(lastUpdate) > 5*time.Second {
+			lastUpdate = time.Now()
+			rate := (count - lastCount) / 5
+			lastCount = count
+			log.Printf("crawling %d so far (~%d/sec)", count, rate)
+		}
 	}
 
-	fmt.Fprintf(os.Stderr, "\n")
+	log.Printf("crawl complete, %d URLs total", count)
 }
 
 func listFromReader(in io.Reader) []string {
@@ -120,9 +133,11 @@ func listFromReader(in io.Reader) []string {
 // the sitemaps within that index will be recursively
 // requested. Requests are not concurrent.
 func FetchAll(url string) ([]string, error) {
+	log.Printf("retrieving sitemap %s", url)
+
 	resp, err := http.Get(url)
 	if err != nil {
-		return nil, err
+		log.Fatalf("error retrieving sitemap %s: %v", url, err)
 	}
 	defer resp.Body.Close()
 
@@ -130,7 +145,7 @@ func FetchAll(url string) ([]string, error) {
 	// body twice, so read to []byte.
 	data, err := ioutil.ReadAll(resp.Body)
 	if err != nil {
-		return nil, err
+		log.Fatalf("error reading content of sitemap %s: %v", url, err)
 	}
 
 	var urls []string

@@ -4,6 +4,7 @@ package sitemap
 
 import (
 	"encoding/xml"
+	"fmt"
 	"io"
 	"io/ioutil"
 	"net/http"
@@ -31,14 +32,14 @@ type index struct {
 func Parse(in io.Reader) ([]string, error) {
 	data, err := ioutil.ReadAll(in)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("Parse couldn't read sitemap data: %v", err)
 	}
 
 	res := &urlset{}
 
 	err = xml.Unmarshal(data, res)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("Parse failed to unmarshal sitemap data: %v", err)
 	}
 
 	return res.URLs, nil
