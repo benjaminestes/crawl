@@ -16,22 +16,14 @@ import (
 
 // Sitemap
 
-type url struct {
-	Loc string `xml:"loc"`
-}
-
 type urlset struct {
-	URLs []url `xml:"url"`
+	URLs []string `xml:"url>loc"`
 }
 
 // Sitemap index
 
-type sitemapURL struct {
-	Loc string `xml:"loc"`
-}
-
 type index struct {
-	URLs []sitemapURL `xml:"sitemap"`
+	Sitemaps []string `xml:"sitemap>loc"`
 }
 
 // Parse interprets in as a sitemap. It returns the URLs in that
@@ -49,12 +41,7 @@ func Parse(in io.Reader) ([]string, error) {
 		return nil, err
 	}
 
-	var urls []string
-	for _, u := range res.URLs {
-		urls = append(urls, u.Loc)
-	}
-
-	return urls, nil
+	return res.URLs, nil
 }
 
 // ParseIndex interprets in as a sitemap index. It returns the sitemap
@@ -72,12 +59,7 @@ func ParseIndex(in io.Reader) ([]string, error) {
 		return nil, err
 	}
 
-	var sitemaps []string
-	for _, s := range res.URLs {
-		sitemaps = append(sitemaps, s.Loc)
-	}
-
-	return sitemaps, nil
+	return res.Sitemaps, nil
 }
 
 // Fetch is like Parse, but it also retrieves its data from the given
