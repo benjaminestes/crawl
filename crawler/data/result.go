@@ -86,20 +86,20 @@ func hydrateHeader(r *Result, resp *http.Response) {
 }
 
 func hydrateHTMLContent(r *Result, doc *html.Node) {
-	r.Title = scrape.TextContent(scrape.QueryNode("title", nil, doc))
-	r.H1 = scrape.TextContent(scrape.QueryNode("h1", nil, doc))
-	r.Description = scrape.GetAttribute(
+	r.Title = scrape.Text(scrape.Query("title", nil, doc))
+	r.H1 = scrape.Text(scrape.Query("h1", nil, doc))
+	r.Description = scrape.Attribute(
 		"content",
-		scrape.QueryNode(
+		scrape.Query(
 			"meta",
 			map[string]string{
 				"name": "description",
 			},
 			doc,
 		))
-	r.Robots = scrape.GetAttribute(
+	r.Robots = scrape.Attribute(
 		"content",
-		scrape.QueryNode("meta",
+		scrape.Query("meta",
 			map[string]string{
 				"name": "robots",
 			},
@@ -109,12 +109,12 @@ func hydrateHTMLContent(r *Result, doc *html.Node) {
 	r.Hreflang = getHreflang(r.Address, doc)
 	r.Links = getLinks(r.Address, doc)
 
-	sum := sha512.Sum512([]byte(scrape.TextContent(scrape.QueryNode("body", nil, doc))))
+	sum := sha512.Sum512([]byte(scrape.Text(scrape.Query("body", nil, doc))))
 	r.BodyTextHash = base64.StdEncoding.EncodeToString(sum[:])
 }
 
 func getCanonical(base *Address, n *html.Node) (c *Canonical) {
-	href := scrape.GetAttribute("href", scrape.QueryNode("link", map[string]string{
+	href := scrape.Attribute("href", scrape.Query("link", map[string]string{
 		"rel": "canonical",
 	}, n))
 	return MakeCanonical(base, href)
@@ -122,13 +122,13 @@ func getCanonical(base *Address, n *html.Node) (c *Canonical) {
 
 // FIXME: Should get the same URL resolving treatment as links
 func getHreflang(base *Address, n *html.Node) (hreflang []*Hreflang) {
-	nodes := scrape.QueryNodes("link", map[string]string{
+	nodes := scrape.QueryAll("link", map[string]string{
 		"rel": "alternate",
 	}, n)
 
 	for _, n := range nodes {
-		lang := scrape.GetAttribute("hreflang", n)
-		href := scrape.GetAttribute("href", n)
+		lang := scrape.Attribute("hreflang", n)
+		href := scrape.Attribute("href", n)
 		if href != "" {
 			hreflang = append(hreflang, MakeHreflang(base, href, lang))
 		}
@@ -138,14 +138,14 @@ func getHreflang(base *Address, n *html.Node) (hreflang []*Hreflang) {
 }
 
 func getLinks(base *Address, n *html.Node) (links []*Link) {
-	els := scrape.GetNodesByTagName("a", n)
+	els := scrape.NodesByTagName("a", n)
 	for _, a := range els {
-		href := scrape.GetAttribute("href", a)
+		href := scrape.Attribute("href", a)
 		link := MakeLink(
 			base,
 			href,
-			scrape.TextContent(a),
-			scrape.GetAttribute("rel", a) == "nofollow", // FIXME: Trim whitespace?
+			scrape.Text(a),
+			scrape.Attribute("rel", a) == "nofollow", // FIXME: Trim whitespace?
 		)
 		links = append(links, link)
 	}

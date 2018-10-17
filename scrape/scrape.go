@@ -7,22 +7,22 @@ import (
 	"golang.org/x/net/html/atom"
 )
 
-func QueryNodes(name string, attrs map[string]string, n *html.Node) (list []*html.Node) {
-	list = GetNodesByTagName(name, n)
+func QueryAll(name string, attrs map[string]string, n *html.Node) []*html.Node {
+	list := NodesByTagName(name, n)
 	list = filterByAttributes(attrs, list)
-	return
+	return list
 }
 
 // FIXME: inefficient
-func QueryNode(name string, attrs map[string]string, n *html.Node) *html.Node {
-	list := QueryNodes(name, attrs, n)
+func Query(name string, attrs map[string]string, n *html.Node) *html.Node {
+	list := QueryAll(name, attrs, n)
 	if list == nil {
 		return nil
 	}
 	return list[0]
 }
 
-func GetNodesByTagName(name string, node *html.Node) []*html.Node {
+func NodesByTagName(name string, node *html.Node) []*html.Node {
 	a := atom.Lookup([]byte(name))
 	var find func(*html.Node) []*html.Node
 	find = func(node *html.Node) (list []*html.Node) {
@@ -37,34 +37,36 @@ func GetNodesByTagName(name string, node *html.Node) []*html.Node {
 	return find(node)
 }
 
-func GetNodesByName(name string, node *html.Node) (list []*html.Node) {
+func NodesByName(name string, node *html.Node) []*html.Node {
+	var list []*html.Node
 	if matchAttribute("name", name, node) {
 		list = append(list, node)
 	}
 	for next := node.FirstChild; next != nil; next = next.NextSibling {
-		list = append(list, GetNodesByName(name, next)...)
+		list = append(list, NodesByName(name, next)...)
 	}
 	return list
 }
 
-func GetNodeByID(id string, node *html.Node) *html.Node {
+func NodeByID(id string, node *html.Node) *html.Node {
 	if matchAttribute("id", id, node) {
 		return node
 	}
 	for next := node.FirstChild; next != nil; next = next.NextSibling {
-		if el := GetNodeByID(id, next); el != nil {
+		if el := NodeByID(id, next); el != nil {
 			return el
 		}
 	}
 	return nil
 }
 
-func GetNodesByClassName(name string, node *html.Node) (list []*html.Node) {
+func NodesByClassName(name string, node *html.Node) []*html.Node {
+	var list []*html.Node
 	if matchClass(name, node) {
 		list = append(list, node)
 	}
 	for next := node.FirstChild; next != nil; next = next.NextSibling {
-		list = append(list, GetNodesByClassName(name, next)...)
+		list = append(list, NodesByClassName(name, next)...)
 	}
 	return list
 }
@@ -90,38 +92,38 @@ func matchAttributes(attrs map[string]string, n *html.Node) bool {
 	return true
 }
 
-func filterByAttribute(k, v string, nodes []*html.Node) (filtered []*html.Node) {
+func filterByAttribute(k, v string, nodes []*html.Node) []*html.Node {
+	var filtered []*html.Node
 	for _, n := range nodes {
 		if matchAttribute(k, v, n) {
 			filtered = append(filtered, n)
 		}
 	}
-	return
+	return filtered
 }
 
-func filterByAttributes(attrs map[string]string, nodes []*html.Node) (filtered []*html.Node) {
-	filtered = nodes
+func filterByAttributes(attrs map[string]string, nodes []*html.Node) []*html.Node {
+	filtered := nodes
 	for k, v := range attrs {
 		filtered = filterByAttribute(k, v, filtered)
 	}
-	return
+	return filtered
 }
 
-func GetAttribute(k string, n *html.Node) (v string) {
+func Attribute(k string, n *html.Node) string {
 	if n == nil {
-		return
+		return ""
 	}
 	for _, a := range n.Attr {
 		if a.Key == k {
-			v = a.Val
-			return
+			return a.Val
 		}
 	}
-	return
+	return ""
 }
 
 func matchClass(class string, n *html.Node) bool {
-	for _, c := range GetClasses(n) {
+	for _, c := range Classes(n) {
 		if c == class {
 			return true
 		}
@@ -129,11 +131,11 @@ func matchClass(class string, n *html.Node) bool {
 	return false
 }
 
-func GetClasses(node *html.Node) []string {
-	return strings.Fields(GetAttribute("class", node))
+func Classes(node *html.Node) []string {
+	return strings.Fields(Attribute("class", node))
 }
 
-func TextContent(n *html.Node) string {
+func Text(n *html.Node) string {
 	var b strings.Builder
 	var getTextHelp func(node *html.Node)
 	getTextHelp = func(node *html.Node) {
