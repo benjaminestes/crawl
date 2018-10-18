@@ -32,11 +32,14 @@ var (
 
 func main() {
 	if len(os.Args) < 2 {
-		log.Fatal(fmt.Errorf("expected command"))
-		os.Exit(1)
+		doHelp()
+		os.Exit(0)
 	}
 
 	switch os.Args[1] {
+	case "help":
+		doHelp()
+		os.Exit(0)
 	case "schema":
 		doSchema()
 	case "spider":
@@ -44,8 +47,10 @@ func main() {
 	case "list":
 		doList()
 	case "sitemap":
+		doSitemap()
 	default:
-		fmt.Fprintf(os.Stderr, "unexpected command")
+		fmt.Fprintf(os.Stderr, "unexpected command: %s\n", os.Args[1])
+		fmt.Fprintf(os.Stderr, `run "crawl help" for usage`+"\n")
 		os.Exit(1)
 	}
 }
@@ -204,4 +209,37 @@ func fetchAll(url string) ([]string, error) {
 	}
 
 	return urls, nil
+}
+
+func doHelp() {
+	fmt.Println("USAGE: crawl <command> [-flags] [args]")
+	fmt.Println()
+	fmt.Println("The following commands are valid:")
+	fmt.Println("\thelp, list, schema, sitemap, spider")
+	fmt.Println()
+	fmt.Println("help\t\tPrint this message.")
+	fmt.Println()
+	fmt.Println("list\t\tCrawl a list of URLs provided on stdin.")
+	fmt.Println()
+	fmt.Println("\t\tThe -format={text|xml} flag determines the expected type.")
+	fmt.Println()
+	fmt.Println("\t\tExample:")
+	fmt.Println("\t\tcrawl list config.json <url_list.txt >out.txt")
+	fmt.Println("\t\tcrawl list -format=xml config.json <sitemap.xml >out.txt")
+	fmt.Println()
+	fmt.Println("schema\t\tPrint a BigQuery-compatible JSON schema to stdout.")
+	fmt.Println()
+	fmt.Println("\t\tExample:")
+	fmt.Println("\t\tcrawl schema >schema.json")
+	fmt.Println()
+	fmt.Println("sitemap\t\tRecursively requests a sitemap or sitemap index from")
+	fmt.Println("\t\ta URL provided as argument.")
+	fmt.Println()
+	fmt.Println("\t\tExample:")
+	fmt.Println("\t\tcrawl sitemap http://www.example.com/sitemap.xml >out.txt")
+	fmt.Println()
+	fmt.Println("spider\t\tCrawl from the URLs specific in the configuration file.")
+	fmt.Println()
+	fmt.Println("\t\tExample:")
+	fmt.Println("\t\tcrawl spider config.json >out.txt")
 }
