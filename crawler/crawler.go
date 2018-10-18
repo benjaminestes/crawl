@@ -283,24 +283,27 @@ func (c *Crawler) merge(links []*data.Link) {
 // contents, if any, and initiates a merge of the links discovered in
 // the process.
 func (c *Crawler) fetch(addr resolvedURL) {
-	result := data.MakeResult(addr.String(), c.depth)
+	var resp *http.Response
 
 	req, err := http.NewRequest("GET", addr.String(), nil)
-	if err != nil {
-		return
+	if err == nil {
+		req.Header.Set("User-Agent", c.UserAgent)
+		resp, err = c.client.Do(req)
+		if err == nil {
+			defer resp.Body.Close()
+		}
 	}
 
-	req.Header.Set("User-Agent", c.UserAgent)
+	result := data.MakeResult(addr.String(), c.depth, resp)
 
-	resp, err := c.client.Do(req)
-	if err != nil {
-		return
+	if resp != nil && resp.StatusCode >= 300 && resp.StatusCode < 400 {
+		c.merge([]*data.Link{
+			&data.Link{
+				Address: result.ResolvesTo,
+			},
+		})
 	}
-	defer resp.Body.Close()
 
-	result.Hydrate(resp)
-	links := result.Links
-
-	c.merge(links)
+	c.merge(result.Links)
 	c.results <- result
 }
