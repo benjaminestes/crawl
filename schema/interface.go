@@ -1,3 +1,6 @@
+// Package scheme is an internal package of the tool Crawl,
+// responsible for automatically generating schema definitions
+// for output files.
 package schema
 
 import "encoding/json"

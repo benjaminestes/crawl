@@ -2,6 +2,8 @@
 // source code is governed by an MIT-style license that can be found
 // in the LICENSE file.
 
+// Package scrape is an internal package of the tool Crawl,
+// responsible for executing a crawl.
 package crawler
 
 import (
