@@ -23,7 +23,6 @@ import (
 )
 
 var (
-	schemaCommand = flag.NewFlagSet("schema", flag.ExitOnError)
 	spiderCommand = flag.NewFlagSet("spider", flag.ExitOnError)
 	listCommand   = flag.NewFlagSet("list", flag.ExitOnError)
 	listType      = listCommand.String("format",
@@ -52,7 +51,6 @@ func main() {
 }
 
 func doSchema() {
-	schemaCommand.Parse(os.Args[2:])
 	os.Stdout.Write(schema.BigQueryJSON())
 	fmt.Println()
 }
@@ -86,7 +84,7 @@ func doSitemap() {
 		log.Fatal(fmt.Errorf("expected sitemap URL"))
 	}
 	var queue []string
-	queue, err = FetchAll(sitemapCommand.Arg(1))
+	queue, err = fetchAll(sitemapCommand.Arg(1))
 	if err != nil {
 		log.Fatal(fmt.Errorf("error fetching sitemap"))
 	}
@@ -96,8 +94,6 @@ func doSitemap() {
 	}
 	c.From = queue
 	c.MaxDepth = 0
-	//		queue, _ := FetchAll(sitemapCommand.Arg(1))
-	//		queue
 	doCrawl(c)
 }
 
@@ -163,11 +159,11 @@ func listFromReader(in io.Reader) []string {
 	return queue
 }
 
-// FetchAll recursively produces a list of all URLs represented by the
+// fetchAll recursively produces a list of all URLs represented by the
 // sitemap (index?) at url. If url points to a sitemap index, all of
 // the sitemaps within that index will be recursively
 // requested. Requests are not concurrent.
-func FetchAll(url string) ([]string, error) {
+func fetchAll(url string) ([]string, error) {
 	log.Printf("retrieving sitemap %s", url)
 
 	resp, err := http.Get(url)
@@ -200,7 +196,7 @@ func FetchAll(url string) ([]string, error) {
 	}
 
 	for _, s := range sitemaps {
-		newurls, err := FetchAll(s)
+		newurls, err := fetchAll(s)
 		if err != nil {
 			return nil, err
 		}
