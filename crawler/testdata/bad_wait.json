@@ -1,0 +1,20 @@
+{
+    "From": [
+	"https://www.distilled.net/"
+    ],
+    "Include": [
+        "^(https?://)?www\\.distilled\\.net/.*$"
+    ],
+    "Exclude": [],
+
+    "MaxDepth": 100,
+
+    "WaitTime": "invalid",
+    "Connections": 20,
+
+    "UserAgent": "Crawler/1.0",
+    "RobotsUserAgent": "Crawler",
+    "RespectNofollow": true,
+
+    "Header": []
+}

@@ -8,7 +8,7 @@ import (
 	"testing"
 )
 
-func TestTest(t *testing.T) {
+func TestDisallowServer(t *testing.T) {
 	mux := http.NewServeMux()
 	// mux.HandleFunc("/", func(w http.ResponseWriter, req *http.Request) {})
 
@@ -57,7 +57,7 @@ func expectedCount(d int) int {
 	return total + 1
 }
 
-func TestTestTwo(t *testing.T) {
+func TestAllowServer(t *testing.T) {
 	var children = []int{0, 1, 2, 3, 4, 5, 6, 7, 8, 9}
 	type Page struct {
 		ID       string

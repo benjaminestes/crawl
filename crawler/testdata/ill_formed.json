@@ -1,0 +1,20 @@
+{
+    "From": [
+	"the comma following this string is illegal",
+    ],
+    "Include": [
+        "^(https?://)?www\\.distilled\\.net/.*$"
+    ],
+    "Exclude": [],
+
+    "MaxDepth": 100,
+
+    "WaitTime": "100ms",
+    "Connections": 20,
+
+    "UserAgent": "Crawler/1.0",
+    "RobotsUserAgent": "Crawler",
+    "RespectNofollow": true,
+
+    "Header": []
+}
