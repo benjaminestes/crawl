@@ -39,8 +39,8 @@ gigabyte.
 
 ## Installation
 
-Currently you must build `crawl` from source. This will require Go
->1.10.
+Currently you must build `crawl` from source. This will require
+Go >1.10.
 
 ```sh
 go get -u github.com/benjaminestes/crawl/...
