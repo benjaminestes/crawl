@@ -2,6 +2,10 @@
 // source code is governed by an MIT-style license that can be found
 // in the LICENSE file.
 
+// This package provides the command crawl, which performs
+// efficient and concurrent crawling. For details:
+//
+// https://github.com/benjaminestes/crawl
 package main
 
 import (

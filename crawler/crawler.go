@@ -51,6 +51,7 @@ type Crawler struct {
 	RespectNofollow bool
 	MaxDepth        int
 	WaitTime        string
+	Header          []*data.Pair
 
 	depth   int
 	queue   []resolvedURL
@@ -290,6 +291,9 @@ func (c *Crawler) fetch(addr resolvedURL) {
 	req, err := http.NewRequest("GET", addr.String(), nil)
 	if err == nil {
 		req.Header.Set("User-Agent", c.UserAgent)
+		for _, h := range c.Header {
+			req.Header.Add(h.K, h.V)
+		}
 		resp, err = c.client.Do(req)
 		if err == nil {
 			defer resp.Body.Close()

@@ -1,5 +1,5 @@
 {
-    "Start": [
+    "From": [
 	"https://www.example.com/"
     ],
     "Include": [
@@ -16,5 +16,7 @@
     "RobotsUserAgent": "Crawler",
     "RespectNofollow": true,
 
-    "Header": []
+    "Header": [
+	{"K": "X-ample", "V":"alue"}
+    ]
 }
