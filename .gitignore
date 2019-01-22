@@ -15,3 +15,5 @@
 crawl.txt
 
 *~
+
+*.ipynb_*
