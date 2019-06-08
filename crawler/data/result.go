@@ -1,6 +1,7 @@
 package data
 
 import (
+	"bytes"
 	"crypto/sha512"
 	"encoding/base64"
 	"net/http"
@@ -42,7 +43,7 @@ type Result struct {
 	ResolvesTo *Address `json:",omitempty"` // In case of redirect
 }
 
-func MakeResult(rawurl string, depth int, resp *http.Response) *Result {
+func MakeResult(rawurl string, depth int, resp *http.Response, body []byte) *Result {
 	// FIXME: Should this contructor return an error?
 	addr := MakeAddress(rawurl)
 	result := &Result{
@@ -51,16 +52,16 @@ func MakeResult(rawurl string, depth int, resp *http.Response) *Result {
 	}
 
 	if resp != nil {
-		result.hydrate(resp)
+		result.hydrate(resp, body)
 	}
 	return result
 }
 
-func (r *Result) hydrate(resp *http.Response) {
+func (r *Result) hydrate(resp *http.Response, body []byte) {
 	hydrateHeader(r, resp)
 
 	if strings.HasPrefix(resp.Header.Get("Content-Type"), "text/html") {
-		doc, err := html.Parse(resp.Body)
+		doc, err := html.Parse(bytes.NewReader(body))
 		if err != nil {
 			return
 		}

@@ -55,7 +55,7 @@ func crawlCheckRobots(c *Crawler) crawlfn {
 	}
 	if !c.robots[rtxtURL](addr.String()) {
 		// FIXME: Can this be some sort of "emit error" func?
-		result := data.MakeResult(addr.String(), c.depth, nil)
+		result := data.MakeResult(addr.String(), c.depth, nil, nil)
 		result.Status = "Blocked by robots.txt"
 		c.results <- result
 		return crawlNext

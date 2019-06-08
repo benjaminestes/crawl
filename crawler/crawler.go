@@ -7,14 +7,19 @@
 package crawler
 
 import (
+	"context"
+	"io/ioutil"
+	"log"
 	"net/http"
 	"net/url"
 	"regexp"
+	"strings"
 	"sync"
 	"time"
 
 	"github.com/benjaminestes/crawl/crawler/data"
 	"github.com/benjaminestes/robots"
+	"github.com/chromedp/chromedp"
 )
 
 type resolvedURL string
@@ -52,6 +57,7 @@ type Crawler struct {
 	MaxDepth        int
 	WaitTime        string
 	Header          []*data.Pair
+	RenderJS        bool
 
 	depth   int
 	queue   []resolvedURL
@@ -300,7 +306,20 @@ func (c *Crawler) fetch(addr resolvedURL) {
 		}
 	}
 
-	result := data.MakeResult(addr.String(), c.depth, resp)
+	// Here is where we decide whether the response is worth trying
+	// to parse.
+	var body []byte
+
+	if strings.HasPrefix(resp.Header.Get("Content-Type"), "text/html") {
+		body, _ = ioutil.ReadAll(resp.Body)
+	}
+
+	// If it is, then possibly we ask headless Chrome to make the request.
+	if len(body) > 0 && c.RenderJS { // Check for JS-rendering option
+		body, _ = rendered(addr)
+	}
+
+	result := data.MakeResult(addr.String(), c.depth, resp, body)
 
 	if resp != nil && resp.StatusCode >= 300 && resp.StatusCode < 400 {
 		c.merge([]*data.Link{
@@ -312,4 +331,21 @@ func (c *Crawler) fetch(addr resolvedURL) {
 
 	c.merge(result.Links)
 	c.results <- result
+}
+
+func rendered(addr resolvedURL) ([]byte, error) {
+	//	timeout, tc := context.WithTimeout(context.Background(), 60000*time.Millisecond)
+	//	defer tc()
+
+	ctx, cancel := chromedp.NewContext(context.Background())
+	defer cancel()
+
+	var res string
+	err := chromedp.Run(ctx,
+		chromedp.Navigate(string(addr)),
+		chromedp.OuterHTML(`html`, &res, chromedp.NodeReady, chromedp.ByQuery),
+	)
+
+	log.Println(err)
+	return []byte(res), nil
 }
