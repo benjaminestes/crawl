@@ -82,19 +82,28 @@ func doSpider() {
 
 func doSitemap() {
 	sitemapCommand.Parse(os.Args[2:])
-
 	if sitemapCommand.NArg() < 1 {
+		log.Fatal(fmt.Errorf("expected location of config file"))
+	}
+	config, err := os.Open(sitemapCommand.Arg(0))
+	if err != nil {
+		log.Fatalf("%v", err)
+	}
+	if sitemapCommand.NArg() < 2 {
 		log.Fatal(fmt.Errorf("expected sitemap URL"))
 	}
-
-	queue, err := fetchAll(sitemapCommand.Arg(0))
+	var queue []string
+	queue, err = fetchAll(sitemapCommand.Arg(1))
 	if err != nil {
 		log.Fatal(fmt.Errorf("error fetching sitemap"))
 	}
-
-	for _, u := range queue {
-		fmt.Println(u)
+	c, err := crawler.FromJSON(config)
+	if err != nil {
+		log.Fatalf("couldn't parse JSON config: %v", err)
 	}
+	c.From = queue
+	c.MaxDepth = 0
+	doCrawl(c)
 }
 
 func doList() {
