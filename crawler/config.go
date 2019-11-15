@@ -11,6 +11,7 @@ var defaultCrawler = Crawler{
 	MaxDepth:        0,
 	RobotsUserAgent: "Crawler",
 	WaitTime:        "100ms",
+	IdleConnTimeout: 30,
 }
 
 func FromJSON(in io.Reader) (*Crawler, error) {
