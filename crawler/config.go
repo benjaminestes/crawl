@@ -4,11 +4,14 @@ import (
 	"encoding/json"
 	"io"
 	"io/ioutil"
+
+	"github.com/benjaminestes/crawl/version"
 )
 
 var defaultCrawler = Crawler{
 	Connections:     1,
 	MaxDepth:        0,
+	UserAgent:       version.UserAgent,
 	RobotsUserAgent: "Crawler",
 	WaitTime:        "100ms",
 }
