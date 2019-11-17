@@ -12,7 +12,6 @@
     "WaitTime": "100ms",
     "Connections": 20,
 
-    "UserAgent": "Crawler/1.0",
     "RobotsUserAgent": "Crawler",
     "RespectNofollow": true,
     "Timeout": "30s",

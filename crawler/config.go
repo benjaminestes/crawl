@@ -11,7 +11,7 @@ import (
 var defaultCrawler = Crawler{
 	Connections:     1,
 	MaxDepth:        0,
-	UserAgent:       version.UserAgent,
+	UserAgent:       version.UserAgent(),
 	RobotsUserAgent: "Crawler",
 
 	// These fields must be set to avoid time parsing errors,
