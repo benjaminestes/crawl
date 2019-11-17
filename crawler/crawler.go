@@ -2,7 +2,7 @@
 // source code is governed by an MIT-style license that can be found
 // in the LICENSE file.
 
-// Package scrape is an internal package of the tool Crawl,
+// Package crawler is an internal package of the tool Crawl,
 // responsible for executing a crawl.
 package crawler
 
@@ -51,6 +51,7 @@ type Crawler struct {
 	RespectNofollow bool
 	MaxDepth        int
 	WaitTime        string
+	IdleConnTimeout time.Duration
 	Header          []*data.Pair
 
 	depth   int
@@ -98,9 +99,8 @@ func initializedClient(c *Crawler) *http.Client {
 			return http.ErrUseLastResponse
 		},
 		Transport: &http.Transport{
-			MaxIdleConns: c.Connections,
-			// FIXME: make configurable
-			IdleConnTimeout: 30 * time.Second,
+			MaxIdleConns:    c.Connections,
+			IdleConnTimeout: c.IdleConnTimeout * time.Second,
 		},
 	}
 }
