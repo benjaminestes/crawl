@@ -12,7 +12,7 @@ WITH
 		link.Address.Full AS FullAddress,
           	COUNT(q.Address) AS InLinks
 	FROM q, UNNEST(Links) AS link
-	GROUP BY link.Address )
+	GROUP BY link.Address.Full )
 
 -- Result is a table with information about addresses appearing as
 -- links.  Because it's possible a page is linked to without being in
