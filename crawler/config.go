@@ -10,8 +10,11 @@ var defaultCrawler = Crawler{
 	Connections:     1,
 	MaxDepth:        0,
 	RobotsUserAgent: "Crawler",
+
+	// These fields must be set to avoid time parsing errors,
+	// and to keep non-zero defaults colocated in this file.
 	WaitTime:        "100ms",
-	IdleConnTimeout: 30,
+	Timeout:         "30s",
 }
 
 func FromJSON(in io.Reader) (*Crawler, error) {

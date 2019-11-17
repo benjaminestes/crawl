@@ -51,7 +51,7 @@ type Crawler struct {
 	RespectNofollow bool
 	MaxDepth        int
 	WaitTime        string
-	IdleConnTimeout time.Duration
+	Timeout         string
 	Header          []*data.Pair
 
 	depth   int
@@ -78,6 +78,7 @@ type Crawler struct {
 
 	// wait is the parsed version of Config.WaitTime
 	wait            time.Duration
+	idleConnTimeout time.Duration
 	lastRequestTime time.Time
 
 	// (in|ex)clude are the compiled versions of
@@ -100,7 +101,7 @@ func initializedClient(c *Crawler) *http.Client {
 		},
 		Transport: &http.Transport{
 			MaxIdleConns:    c.Connections,
-			IdleConnTimeout: c.IdleConnTimeout * time.Second,
+			IdleConnTimeout: c.idleConnTimeout,
 		},
 	}
 }
@@ -112,34 +113,26 @@ func initializedClient(c *Crawler) *http.Client {
 //
 // If Start returns a non-nil error, calls to Next will fail.
 func (c *Crawler) Start() error {
-	waitString := "1ms"
-	if c.WaitTime != "" {
-		waitString = c.WaitTime
-	}
-
-	wait, err := time.ParseDuration(waitString)
-	if err != nil {
+	var err error
+	
+	if c.wait, err = time.ParseDuration(c.WaitTime); err != nil {
 		return err
 	}
 
-	queue, err := c.initialQueue()
-	if err != nil {
+	if c.idleConnTimeout, err = time.ParseDuration(c.Timeout); err != nil {
 		return err
 	}
 
-	conns := c.Connections
-	if conns < 1 {
-		conns = 1
+	if c.queue, err = c.initialQueue(); err != nil {
+		return err
 	}
 
 	c.client = initializedClient(c)
-	c.connections = make(chan bool, conns)
+	c.connections = make(chan bool, c.Connections)
 	c.exclude = preparePattern(c.Exclude)
 	c.include = preparePattern(c.Include)
-	c.queue = queue
 	c.robots = make(map[string]func(string) bool)
 	c.seen = make(map[resolvedURL]bool)
-	c.wait = wait
 
 	// If a URL has not been seen when the crawler processes a
 	// link, that URL will be added to the next queue to crawl. It
@@ -151,7 +144,7 @@ func (c *Crawler) Start() error {
 		c.seen[addr] = true
 	}
 
-	c.results = make(chan *data.Result, conns)
+	c.results = make(chan *data.Result, c.Connections)
 	go func() {
 		for f := crawlStartQueue; f != nil; f = f(c) {
 		}
