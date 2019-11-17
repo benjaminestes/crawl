@@ -194,33 +194,6 @@ func (c *Crawler) willCrawl(fullurl resolvedURL) bool {
 	return true
 }
 
-// addRobots creates a robots.txt matcher from a URL string. If there
-// is a problem reading from robots.txt, treat it as a server error.
-func (c *Crawler) addRobots(fullurl string) {
-	rtxtURL, err := robots.Locate(fullurl)
-	if err != nil {
-		// Error parsing fullurl.
-		return
-	}
-
-	resp, err := http.Get(rtxtURL)
-	if err != nil {
-		rtxt, _ := robots.From(503, nil)
-		c.robots[rtxtURL] = rtxt.Tester(c.RobotsUserAgent)
-		return
-	}
-	defer resp.Body.Close()
-
-	rtxt, err := robots.From(resp.StatusCode, resp.Body)
-	if err != nil {
-		rtxt, _ := robots.From(503, nil)
-		c.robots[rtxtURL] = rtxt.Tester(c.RobotsUserAgent)
-		return
-	}
-
-	c.robots[rtxtURL] = rtxt.Tester(c.RobotsUserAgent)
-}
-
 // Returns the next result from the crawl. Results are guaranteed to come
 // out in order ascending by depth. Within a "level" of depth, there is
 // no guarantee as to which URLs will be crawled first.
@@ -279,20 +252,22 @@ func (c *Crawler) merge(links []*data.Link) {
 // contents, if any, and initiates a merge of the links discovered in
 // the process.
 func (c *Crawler) fetch(addr resolvedURL) {
-	var resp *http.Response
-
 	req, err := http.NewRequest("GET", addr.String(), nil)
-	if err == nil {
-		req.Header.Set("User-Agent", c.UserAgent)
-		for _, h := range c.Header {
-			req.Header.Add(h.K, h.V)
-		}
-		resp, err = c.client.Do(req)
-		if err == nil {
-			defer resp.Body.Close()
-		}
+	if err != nil {
+		// FIXME: How should this be handled?
+		return
 	}
-
+	
+	req.Header.Set("User-Agent", c.UserAgent)
+	for _, h := range c.Header {
+		req.Header.Add(h.K, h.V)
+	}
+	
+	resp, err := c.client.Do(req)
+	if err == nil {
+		defer resp.Body.Close()
+	}
+	
 	result := data.MakeResult(addr.String(), c.depth, resp)
 
 	if resp != nil && resp.StatusCode >= 300 && resp.StatusCode < 400 {
@@ -305,4 +280,42 @@ func (c *Crawler) fetch(addr resolvedURL) {
 
 	c.merge(result.Links)
 	c.results <- result
+}
+
+// addRobots creates a robots.txt matcher from a URL string. If there
+// is a problem reading from robots.txt, treat it as a server error.
+func (c *Crawler) addRobots(fullurl string) {
+	rtxtURL, err := robots.Locate(fullurl)
+	if err != nil {
+		// FIXME: Error parsing fullurl.
+		return
+	}
+	
+	req, err := http.NewRequest("GET", rtxtURL, nil)
+	if err != nil {
+		// FIXME: How should this be handled?
+		return
+	}
+	
+	req.Header.Set("User-Agent", c.UserAgent)
+	for _, h := range c.Header {
+		req.Header.Add(h.K, h.V)
+	}
+	
+	resp, err := c.client.Do(req)
+	if err != nil {
+		rtxt, _ := robots.From(503, nil)
+		c.robots[rtxtURL] = rtxt.Tester(c.RobotsUserAgent)
+		return
+	}
+	defer resp.Body.Close()
+
+	rtxt, err := robots.From(resp.StatusCode, resp.Body)
+	if err != nil {
+		rtxt, _ := robots.From(503, nil)
+		c.robots[rtxtURL] = rtxt.Tester(c.RobotsUserAgent)
+		return
+	}
+
+	c.robots[rtxtURL] = rtxt.Tester(c.RobotsUserAgent)
 }

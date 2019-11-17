@@ -47,7 +47,7 @@ func crawlCheckRobots(c *Crawler) crawlfn {
 	addr := c.queue[0]
 	rtxtURL, err := robots.Locate(addr.String())
 	if err != nil {
-		// Couldn't parse URL. Is this the desired behavior?
+		// FIXME: Couldn't parse URL. Is this the desired behavior?
 		return crawlNext
 	}
 	if _, ok := c.robots[rtxtURL]; !ok {
