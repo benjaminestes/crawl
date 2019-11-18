@@ -252,21 +252,12 @@ func (c *Crawler) merge(links []*data.Link) {
 // contents, if any, and initiates a merge of the links discovered in
 // the process.
 func (c *Crawler) fetch(addr resolvedURL) {
-	req, err := http.NewRequest("GET", addr.String(), nil)
+	resp, err := requestAsCrawler(c, addr)
 	if err != nil {
-		// FIXME: How should this be handled?
+		// FIXME: Should this panic? Under what conditions would this fail?
 		return
 	}
-	
-	req.Header.Set("User-Agent", c.UserAgent)
-	for _, h := range c.Header {
-		req.Header.Add(h.K, h.V)
-	}
-	
-	resp, err := c.client.Do(req)
-	if err == nil {
-		defer resp.Body.Close()
-	}
+	defer resp.Body.Close()
 	
 	result := data.MakeResult(addr.String(), c.depth, resp)
 
@@ -284,28 +275,11 @@ func (c *Crawler) fetch(addr resolvedURL) {
 
 // addRobots creates a robots.txt matcher from a URL string. If there
 // is a problem reading from robots.txt, treat it as a server error.
-func (c *Crawler) addRobots(fullurl string) {
-	rtxtURL, err := robots.Locate(fullurl)
-	if err != nil {
-		// FIXME: Error parsing fullurl.
-		return
-	}
-	
-	req, err := http.NewRequest("GET", rtxtURL, nil)
-	if err != nil {
-		// FIXME: How should this be handled?
-		return
-	}
-	
-	req.Header.Set("User-Agent", c.UserAgent)
-	for _, h := range c.Header {
-		req.Header.Add(h.K, h.V)
-	}
-	
-	resp, err := c.client.Do(req)
+func (c *Crawler) addRobots(u resolvedURL) {
+	resp, err := requestAsCrawler(c, u)
 	if err != nil {
 		rtxt, _ := robots.From(503, nil)
-		c.robots[rtxtURL] = rtxt.Tester(c.RobotsUserAgent)
+		c.robots[u.String()] = rtxt.Tester(c.RobotsUserAgent)
 		return
 	}
 	defer resp.Body.Close()
@@ -313,9 +287,24 @@ func (c *Crawler) addRobots(fullurl string) {
 	rtxt, err := robots.From(resp.StatusCode, resp.Body)
 	if err != nil {
 		rtxt, _ := robots.From(503, nil)
-		c.robots[rtxtURL] = rtxt.Tester(c.RobotsUserAgent)
+		c.robots[u.String()] = rtxt.Tester(c.RobotsUserAgent)
 		return
 	}
 
-	c.robots[rtxtURL] = rtxt.Tester(c.RobotsUserAgent)
+	c.robots[u.String()] = rtxt.Tester(c.RobotsUserAgent)
+}
+
+// 
+func requestAsCrawler(c *Crawler, u resolvedURL) (*http.Response, error) {
+	req, err := http.NewRequest("GET", u.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+	
+	req.Header.Set("User-Agent", c.UserAgent)
+	for _, h := range c.Header {
+		req.Header.Add(h.K, h.V)
+	}
+	
+	return c.client.Do(req)
 }

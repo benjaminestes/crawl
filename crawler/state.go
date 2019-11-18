@@ -51,7 +51,7 @@ func crawlCheckRobots(c *Crawler) crawlfn {
 		return crawlNext
 	}
 	if _, ok := c.robots[rtxtURL]; !ok {
-		c.addRobots(rtxtURL)
+		c.addRobots(resolvedURL(rtxtURL))
 	}
 	if !c.robots[rtxtURL](addr.String()) {
 		// FIXME: Can this be some sort of "emit error" func?
