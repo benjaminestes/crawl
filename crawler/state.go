@@ -44,7 +44,8 @@ func crawlWait(c *Crawler) crawlfn {
 // URL to be requested. If we get here, it means we've already decided
 // the URL is in the scope of the crawl as defined by the end user.
 func crawlCheckRobots(c *Crawler) crawlfn {
-	addr := c.queue[0]
+	qp := c.queue[0]
+	addr := qp.url
 	rtxtURL, err := robots.Locate(addr.String())
 	if err != nil {
 		// FIXME: Couldn't parse URL. Is this the desired behavior?
@@ -55,7 +56,7 @@ func crawlCheckRobots(c *Crawler) crawlfn {
 	}
 	if !c.robots[rtxtURL](addr.String()) {
 		// FIXME: Can this be some sort of "emit error" func?
-		result := data.MakeResult(addr.String(), c.depth, nil)
+		result := data.MakeResult(addr.String(), qp.depth, nil)
 		result.Status = "Blocked by robots.txt"
 		c.results <- result
 		return crawlNext
@@ -67,7 +68,7 @@ func crawlCheckRobots(c *Crawler) crawlfn {
 // determined to try to crawl. The next step is to secure resources to
 // actually crawl the URL, and initiate fetching.
 func crawlDo(c *Crawler) crawlfn {
-	addr := c.queue[0]
+	queuePair := c.queue[0]
 	// This blocks when there are = c.Connections fetches active.
 	// Otherwise, it secures a token.
 	c.connections <- true
@@ -80,7 +81,7 @@ func crawlDo(c *Crawler) crawlfn {
 		// ultimately the extraction of the links on the
 		// crawled page. Merging of newly discovered URLs
 		// happens as part of this call.
-		c.fetch(addr)
+		c.fetch(queuePair)
 	}()
 	return crawlNext
 }
@@ -89,10 +90,14 @@ func crawlDo(c *Crawler) crawlfn {
 // more URLs in the current queue, we wait for all currently active
 // fetches to complete.
 func crawlNext(c *Crawler) crawlfn {
+	c.mu.Lock()
 	c.queue = c.queue[1:]
+	c.mu.Unlock()
+
 	if len(c.queue) > 0 {
 		return crawlStart
 	}
+
 	return crawlAwait
 }
 
@@ -101,15 +106,5 @@ func crawlNext(c *Crawler) crawlfn {
 // level by level.
 func crawlAwait(c *Crawler) crawlfn {
 	c.wg.Wait()
-	return crawlNextQueue
-}
-
-// crawlNextQueue replace the current queue with the next and starts
-// the process again. This next queue represents the accumulated URLs
-// in the next level of the crawl that we haven't yet seen.
-func crawlNextQueue(c *Crawler) crawlfn {
-	c.queue = c.nextqueue
-	c.nextqueue = nil
-	c.depth++
 	return crawlStartQueue
 }
