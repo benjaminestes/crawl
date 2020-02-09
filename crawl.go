@@ -24,6 +24,7 @@ import (
 	"github.com/benjaminestes/crawl/crawler"
 	"github.com/benjaminestes/crawl/schema"
 	"github.com/benjaminestes/crawl/sitemap"
+	"github.com/benjaminestes/crawl/version"
 )
 
 var (
@@ -32,6 +33,7 @@ var (
 	listType      = listCommand.String("format",
 		"text", "format of input for list mode: {text|xml}")
 	sitemapCommand = flag.NewFlagSet("sitemap", flag.ExitOnError)
+	versionCommand = flag.NewFlagSet("version", flag.ExitOnError)
 )
 
 func main() {
@@ -52,6 +54,9 @@ func main() {
 		doList()
 	case "sitemap":
 		doSitemap()
+	case "version":
+		doVersion()
+		os.Exit(0)
 	default:
 		fmt.Fprintf(os.Stderr, "unexpected command: %s\n", os.Args[1])
 		fmt.Fprintf(os.Stderr, `run "crawl help" for usage`+"\n")
@@ -62,6 +67,10 @@ func main() {
 func doSchema() {
 	os.Stdout.Write(schema.BigQueryJSON())
 	fmt.Println()
+}
+
+func doVersion() {
+	fmt.Println(version.Version)
 }
 
 func doSpider() {
@@ -82,28 +91,19 @@ func doSpider() {
 
 func doSitemap() {
 	sitemapCommand.Parse(os.Args[2:])
+
 	if sitemapCommand.NArg() < 1 {
-		log.Fatal(fmt.Errorf("expected location of config file"))
-	}
-	config, err := os.Open(sitemapCommand.Arg(0))
-	if err != nil {
-		log.Fatalf("%v", err)
-	}
-	if sitemapCommand.NArg() < 2 {
 		log.Fatal(fmt.Errorf("expected sitemap URL"))
 	}
-	var queue []string
-	queue, err = fetchAll(sitemapCommand.Arg(1))
+
+	queue, err := fetchAll(sitemapCommand.Arg(0))
 	if err != nil {
 		log.Fatal(fmt.Errorf("error fetching sitemap"))
 	}
-	c, err := crawler.FromJSON(config)
-	if err != nil {
-		log.Fatalf("couldn't parse JSON config: %v", err)
+
+	for _, u := range queue {
+		fmt.Println(u)
 	}
-	c.From = queue
-	c.MaxDepth = 0
-	doCrawl(c)
 }
 
 func doList() {
@@ -219,7 +219,7 @@ func doHelp() {
 	fmt.Println("USAGE: crawl <command> [-flags] [args]")
 	fmt.Println()
 	fmt.Println("The following commands are valid:")
-	fmt.Println("\thelp, list, schema, sitemap, spider")
+	fmt.Println("\thelp, list, schema, sitemap, spider, version")
 	fmt.Println()
 	fmt.Println("help\t\tPrint this message.")
 	fmt.Println()
@@ -246,4 +246,6 @@ func doHelp() {
 	fmt.Println()
 	fmt.Println("\t\tExample:")
 	fmt.Println("\t\tcrawl spider config.json >out.txt")
+	fmt.Println()
+	fmt.Println("version\t\tPrint the version.")
 }

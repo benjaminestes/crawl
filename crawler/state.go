@@ -8,7 +8,7 @@ import (
 	"time"
 
 	"github.com/benjaminestes/crawl/crawler/data"
-	"github.com/benjaminestes/robots"
+	"github.com/benjaminestes/robots/v2"
 )
 
 // A crawlfn represents a state of the crawler state machine.  Its
@@ -47,11 +47,11 @@ func crawlCheckRobots(c *Crawler) crawlfn {
 	addr := c.queue[0]
 	rtxtURL, err := robots.Locate(addr.String())
 	if err != nil {
-		// Couldn't parse URL. Is this the desired behavior?
+		// FIXME: Couldn't parse URL. Is this the desired behavior?
 		return crawlNext
 	}
 	if _, ok := c.robots[rtxtURL]; !ok {
-		c.addRobots(rtxtURL)
+		c.addRobots(resolvedURL(rtxtURL))
 	}
 	if !c.robots[rtxtURL](addr.String()) {
 		// FIXME: Can this be some sort of "emit error" func?

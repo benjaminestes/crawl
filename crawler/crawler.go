@@ -2,7 +2,7 @@
 // source code is governed by an MIT-style license that can be found
 // in the LICENSE file.
 
-// Package scrape is an internal package of the tool Crawl,
+// Package crawler is an internal package of the tool Crawl,
 // responsible for executing a crawl.
 package crawler
 
@@ -14,7 +14,7 @@ import (
 	"time"
 
 	"github.com/benjaminestes/crawl/crawler/data"
-	"github.com/benjaminestes/robots"
+	"github.com/benjaminestes/robots/v2"
 )
 
 type resolvedURL string
@@ -51,6 +51,7 @@ type Crawler struct {
 	RespectNofollow bool
 	MaxDepth        int
 	WaitTime        string
+	Timeout         string
 	Header          []*data.Pair
 
 	depth   int
@@ -77,6 +78,7 @@ type Crawler struct {
 
 	// wait is the parsed version of Config.WaitTime
 	wait            time.Duration
+	idleConnTimeout time.Duration
 	lastRequestTime time.Time
 
 	// (in|ex)clude are the compiled versions of
@@ -98,9 +100,8 @@ func initializedClient(c *Crawler) *http.Client {
 			return http.ErrUseLastResponse
 		},
 		Transport: &http.Transport{
-			MaxIdleConns: c.Connections,
-			// FIXME: make configurable
-			IdleConnTimeout: 30 * time.Second,
+			MaxIdleConns:    c.Connections,
+			IdleConnTimeout: c.idleConnTimeout,
 		},
 	}
 }
@@ -112,34 +113,26 @@ func initializedClient(c *Crawler) *http.Client {
 //
 // If Start returns a non-nil error, calls to Next will fail.
 func (c *Crawler) Start() error {
-	waitString := "1ms"
-	if c.WaitTime != "" {
-		waitString = c.WaitTime
-	}
-
-	wait, err := time.ParseDuration(waitString)
-	if err != nil {
+	var err error
+	
+	if c.wait, err = time.ParseDuration(c.WaitTime); err != nil {
 		return err
 	}
 
-	queue, err := c.initialQueue()
-	if err != nil {
+	if c.idleConnTimeout, err = time.ParseDuration(c.Timeout); err != nil {
 		return err
 	}
 
-	conns := c.Connections
-	if conns < 1 {
-		conns = 1
+	if c.queue, err = c.initialQueue(); err != nil {
+		return err
 	}
 
 	c.client = initializedClient(c)
-	c.connections = make(chan bool, conns)
+	c.connections = make(chan bool, c.Connections)
 	c.exclude = preparePattern(c.Exclude)
 	c.include = preparePattern(c.Include)
-	c.queue = queue
 	c.robots = make(map[string]func(string) bool)
 	c.seen = make(map[resolvedURL]bool)
-	c.wait = wait
 
 	// If a URL has not been seen when the crawler processes a
 	// link, that URL will be added to the next queue to crawl. It
@@ -151,7 +144,7 @@ func (c *Crawler) Start() error {
 		c.seen[addr] = true
 	}
 
-	c.results = make(chan *data.Result, conns)
+	c.results = make(chan *data.Result, c.Connections)
 	go func() {
 		for f := crawlStartQueue; f != nil; f = f(c) {
 		}
@@ -199,33 +192,6 @@ func (c *Crawler) willCrawl(fullurl resolvedURL) bool {
 		return false
 	}
 	return true
-}
-
-// addRobots creates a robots.txt matcher from a URL string. If there
-// is a problem reading from robots.txt, treat it as a server error.
-func (c *Crawler) addRobots(fullurl string) {
-	rtxtURL, err := robots.Locate(fullurl)
-	if err != nil {
-		// Error parsing fullurl.
-		return
-	}
-
-	resp, err := http.Get(rtxtURL)
-	if err != nil {
-		rtxt, _ := robots.From(503, nil)
-		c.robots[rtxtURL] = rtxt.Tester(c.RobotsUserAgent)
-		return
-	}
-	defer resp.Body.Close()
-
-	rtxt, err := robots.From(resp.StatusCode, resp.Body)
-	if err != nil {
-		rtxt, _ := robots.From(503, nil)
-		c.robots[rtxtURL] = rtxt.Tester(c.RobotsUserAgent)
-		return
-	}
-
-	c.robots[rtxtURL] = rtxt.Tester(c.RobotsUserAgent)
 }
 
 // Returns the next result from the crawl. Results are guaranteed to come
@@ -286,20 +252,13 @@ func (c *Crawler) merge(links []*data.Link) {
 // contents, if any, and initiates a merge of the links discovered in
 // the process.
 func (c *Crawler) fetch(addr resolvedURL) {
-	var resp *http.Response
-
-	req, err := http.NewRequest("GET", addr.String(), nil)
-	if err == nil {
-		req.Header.Set("User-Agent", c.UserAgent)
-		for _, h := range c.Header {
-			req.Header.Add(h.K, h.V)
-		}
-		resp, err = c.client.Do(req)
-		if err == nil {
-			defer resp.Body.Close()
-		}
+	resp, err := requestAsCrawler(c, addr)
+	if err != nil {
+		// FIXME: Should this panic? Under what conditions would this fail?
+		return
 	}
-
+	defer resp.Body.Close()
+	
 	result := data.MakeResult(addr.String(), c.depth, resp)
 
 	if resp != nil && resp.StatusCode >= 300 && resp.StatusCode < 400 {
@@ -312,4 +271,40 @@ func (c *Crawler) fetch(addr resolvedURL) {
 
 	c.merge(result.Links)
 	c.results <- result
+}
+
+// addRobots creates a robots.txt matcher from a URL string. If there
+// is a problem reading from robots.txt, treat it as a server error.
+func (c *Crawler) addRobots(u resolvedURL) {
+	resp, err := requestAsCrawler(c, u)
+	if err != nil {
+		rtxt, _ := robots.From(503, nil)
+		c.robots[u.String()] = rtxt.Tester(c.RobotsUserAgent)
+		return
+	}
+	defer resp.Body.Close()
+
+	rtxt, err := robots.From(resp.StatusCode, resp.Body)
+	if err != nil {
+		rtxt, _ := robots.From(503, nil)
+		c.robots[u.String()] = rtxt.Tester(c.RobotsUserAgent)
+		return
+	}
+
+	c.robots[u.String()] = rtxt.Tester(c.RobotsUserAgent)
+}
+
+// 
+func requestAsCrawler(c *Crawler, u resolvedURL) (*http.Response, error) {
+	req, err := http.NewRequest("GET", u.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+	
+	req.Header.Set("User-Agent", c.UserAgent)
+	for _, h := range c.Header {
+		req.Header.Add(h.K, h.V)
+	}
+	
+	return c.client.Do(req)
 }

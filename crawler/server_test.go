@@ -25,6 +25,7 @@ func TestDisallowServer(t *testing.T) {
 		RobotsUserAgent: "Crawler",
 		Connections:     2,
 		WaitTime:        "100ms",
+		Timeout:         "30s",
 	}
 
 	err := c.Start()
@@ -95,6 +96,7 @@ func TestAllowServer(t *testing.T) {
 		Connections:     20,
 		RespectNofollow: true,
 		WaitTime:        "1ms",
+		Timeout:         "30s",
 	}
 
 	err := c.Start()
