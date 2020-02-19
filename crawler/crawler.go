@@ -17,14 +17,19 @@ import (
 	"github.com/benjaminestes/robots/v2"
 )
 
+type queuePair struct {
+	url   resolvedURL
+	depth int
+}
+
 type resolvedURL string
 
 func (u resolvedURL) String() string {
 	return string(u)
 }
 
-func (c *Crawler) initialQueue() ([]resolvedURL, error) {
-	var result []resolvedURL
+func (c *Crawler) initialQueue() ([]queuePair, error) {
+	var result []queuePair
 	for _, s := range c.From {
 		u, err := url.Parse(s)
 		if err != nil {
@@ -35,7 +40,7 @@ func (c *Crawler) initialQueue() ([]resolvedURL, error) {
 		if u.Path == "" {
 			u.Path = "/"
 		}
-		result = append(result, resolvedURL(u.String()))
+		result = append(result, queuePair{resolvedURL(u.String()), 1})
 	}
 	return result, nil
 }
@@ -50,23 +55,22 @@ type Crawler struct {
 	From            []string
 	RespectNofollow bool
 	MaxDepth        int
+	MaxPages		int
 	WaitTime        string
 	Timeout         string
 	Header          []*data.Pair
 
-	depth   int
-	queue   []resolvedURL
+	// mu guards queue when multiple fetches
+	// to it simultaneously
+	mu    sync.Mutex
+	queue []queuePair
+
 	seen    map[resolvedURL]bool
 	results chan *data.Result
 
 	// robots maintains a robots.txt matcher for every encountered
 	// domain
 	robots map[string]func(string) bool
-
-	// mu guards nextqueue when multiple fetches may try to write
-	// to it simultaneously
-	nextqueue []resolvedURL
-	mu        sync.Mutex
 
 	// wg waits for all spawned fetches to complete before
 	// crawling the next level
@@ -114,7 +118,7 @@ func initializedClient(c *Crawler) *http.Client {
 // If Start returns a non-nil error, calls to Next will fail.
 func (c *Crawler) Start() error {
 	var err error
-	
+
 	if c.wait, err = time.ParseDuration(c.WaitTime); err != nil {
 		return err
 	}
@@ -140,8 +144,8 @@ func (c *Crawler) Start() error {
 	// crawled. Therefore, we add all URLs from the initial queue
 	// to the set of URLs that have been seen, before the crawl
 	// starts.
-	for _, addr := range c.queue {
-		c.seen[addr] = true
+	for _, queuePair := range c.queue {
+		c.seen[queuePair.url] = true
 	}
 
 	c.results = make(chan *data.Result, c.Connections)
@@ -198,7 +202,7 @@ func (c *Crawler) willCrawl(fullurl resolvedURL) bool {
 // out in order ascending by depth. Within a "level" of depth, there is
 // no guarantee as to which URLs will be crawled first.
 //
-// Result objects are suitable for Marshling into JSON format and conform
+// Result objects are suitable for Marshaling into JSON format and conform
 // to the schema exported by the crawler.Schema package.
 func (c *Crawler) Next() *data.Result {
 	node, ok := <-c.results
@@ -217,10 +221,10 @@ func (c *Crawler) resetWait() {
 // crawled.  In other words, it assembles the URLs that represent the
 // next level of the crawl. Many merges could be simultaneously
 // active.
-func (c *Crawler) merge(links []*data.Link) {
+func (c *Crawler) merge(links []*data.Link, qp queuePair) {
 	// This is how the crawler terminates — it will encounter an
 	// empty queue if no URLs have been added to the next queue.
-	if !(c.depth < c.MaxDepth) {
+	if !(qp.depth < c.MaxDepth) {
 		return
 	}
 	for _, link := range links {
@@ -239,9 +243,14 @@ func (c *Crawler) merge(links []*data.Link) {
 		// mutated after it is initialized.
 		c.mu.Lock()
 		if _, ok := c.seen[linkURL]; !ok {
+			if c.MaxPages > 0 && len(c.seen) >= c.MaxPages {
+				c.mu.Unlock() // Release the lock
+				break // Break early
+			}
+
 			if !(link.Nofollow && c.RespectNofollow) {
 				c.seen[linkURL] = true
-				c.nextqueue = append(c.nextqueue, linkURL)
+				c.queue = append(c.queue, queuePair{linkURL, qp.depth + 1})
 			}
 		}
 		c.mu.Unlock()
@@ -251,32 +260,32 @@ func (c *Crawler) merge(links []*data.Link) {
 // fetch requests a URL, hydrates a result object based on its
 // contents, if any, and initiates a merge of the links discovered in
 // the process.
-func (c *Crawler) fetch(addr resolvedURL) {
-	resp, err := requestAsCrawler(c, addr)
+func (c *Crawler) fetch(queuePair queuePair) {
+	resp, err := requestAsCrawler(c, queuePair)
 	if err != nil {
 		// FIXME: Should this panic? Under what conditions would this fail?
 		return
 	}
 	defer resp.Body.Close()
-	
-	result := data.MakeResult(addr.String(), c.depth, resp)
+
+	result := data.MakeResult(queuePair.url.String(), queuePair.depth, resp)
 
 	if resp != nil && resp.StatusCode >= 300 && resp.StatusCode < 400 {
 		c.merge([]*data.Link{
 			&data.Link{
 				Address: result.ResolvesTo,
 			},
-		})
+		}, queuePair)
 	}
 
-	c.merge(result.Links)
+	c.merge(result.Links, queuePair)
 	c.results <- result
 }
 
 // addRobots creates a robots.txt matcher from a URL string. If there
 // is a problem reading from robots.txt, treat it as a server error.
 func (c *Crawler) addRobots(u resolvedURL) {
-	resp, err := requestAsCrawler(c, u)
+	resp, err := requestAsCrawler(c, queuePair{u, 0})
 	if err != nil {
 		rtxt, _ := robots.From(503, nil)
 		c.robots[u.String()] = rtxt.Tester(c.RobotsUserAgent)
@@ -294,17 +303,17 @@ func (c *Crawler) addRobots(u resolvedURL) {
 	c.robots[u.String()] = rtxt.Tester(c.RobotsUserAgent)
 }
 
-// 
-func requestAsCrawler(c *Crawler, u resolvedURL) (*http.Response, error) {
-	req, err := http.NewRequest("GET", u.String(), nil)
+//
+func requestAsCrawler(c *Crawler, qp queuePair) (*http.Response, error) {
+	req, err := http.NewRequest("GET", qp.url.String(), nil)
 	if err != nil {
 		return nil, err
 	}
-	
+
 	req.Header.Set("User-Agent", c.UserAgent)
 	for _, h := range c.Header {
 		req.Header.Add(h.K, h.V)
 	}
-	
+
 	return c.client.Do(req)
 }

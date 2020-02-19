@@ -138,6 +138,7 @@ func doList() {
 func doCrawl(c *crawler.Crawler) {
 	count, lastCount := 0, 0
 	lastUpdate := time.Now()
+	startCrawl := time.Now()
 	err := c.Start()
 	if err != nil {
 		// FIXME: need a way to signal error
@@ -156,7 +157,10 @@ func doCrawl(c *crawler.Crawler) {
 		}
 	}
 
-	log.Printf("crawl complete, %d URLs total", count)
+	totalTime := int(time.Since(startCrawl).Seconds())
+	rate := count / totalTime
+
+	log.Printf("crawl complete, %d URLs total in %d seconds (~%d/sec)", count, totalTime, rate )
 }
 
 func listFromReader(in io.Reader) []string {

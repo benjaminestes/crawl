@@ -106,6 +106,7 @@ particular, you should think about these options:
     in spider mode.
 - `MaxDepth`: Only URLs fewer links than `MaxDepth` from the `From`
     list will be crawled.
+- `MaxPages`: Limit the spider to only this number of pages. 0 means unlimited.
 - `WaitTime`: Pause time between spawning requests. Approximates crawl
     rate.  For instance, to crawl about 5 URLs per second, set this to
     "200ms". It uses Go's [time parsing
