@@ -8,6 +8,7 @@
     "Exclude": [],
 
     "MaxDepth": 3,
+    "MaxPages": 0,
 
     "WaitTime": "100ms",
     "Connections": 20,

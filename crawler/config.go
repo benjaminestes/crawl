@@ -11,6 +11,7 @@ import (
 var defaultCrawler = Crawler{
 	Connections:     1,
 	MaxDepth:        0,
+	MaxPages:		 0,
 	UserAgent:       version.UserAgent(),
 	RobotsUserAgent: "Crawler",
 

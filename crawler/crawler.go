@@ -55,6 +55,7 @@ type Crawler struct {
 	From            []string
 	RespectNofollow bool
 	MaxDepth        int
+	MaxPages		int
 	WaitTime        string
 	Timeout         string
 	Header          []*data.Pair
@@ -201,7 +202,7 @@ func (c *Crawler) willCrawl(fullurl resolvedURL) bool {
 // out in order ascending by depth. Within a "level" of depth, there is
 // no guarantee as to which URLs will be crawled first.
 //
-// Result objects are suitable for Marshling into JSON format and conform
+// Result objects are suitable for Marshaling into JSON format and conform
 // to the schema exported by the crawler.Schema package.
 func (c *Crawler) Next() *data.Result {
 	node, ok := <-c.results
@@ -242,6 +243,11 @@ func (c *Crawler) merge(links []*data.Link, qp queuePair) {
 		// mutated after it is initialized.
 		c.mu.Lock()
 		if _, ok := c.seen[linkURL]; !ok {
+			if c.MaxPages > 0 && len(c.seen) >= c.MaxPages {
+				c.mu.Unlock() // Release the lock
+				break // Break early
+			}
+
 			if !(link.Nofollow && c.RespectNofollow) {
 				c.seen[linkURL] = true
 				c.queue = append(c.queue, queuePair{linkURL, qp.depth + 1})
