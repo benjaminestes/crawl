@@ -51,6 +51,18 @@ tool. The binary will be put in your $GOBIN directory. Adding $GOBIN
 to your $PATH will allow you to call `crawl` without specifying its
 location.
 
+You can install `crawl` from binaries if you don't have Go installed on your machine via GoBinaries. The GoBinaries service compiles the binaries from the Github repo's master branch using Go 1.13 on the fly and also caches them for future installation requests.
+
+Use the follow to install the latest version.
+```sh
+curl -sf https://gobinaries.com/benjaminestes/crawl | sh
+```
+
+To install a specific version of `crawl` use the following.
+```sh
+curl -sf https://gobinaries.com/benjaminestes/crawl@0.2.1 | sh
+```
+
 ## Use
 
 ```
